@@ -5,10 +5,11 @@ Ask Delphi Content Download Script
 Downloads all content from an Ask Delphi project to a JSON file.
 
 Usage:
-    python download_content.py                     # Download all content
+    python download_content.py                     # Download all content (10 parallel)
     python download_content.py -o backup.json      # Save to specific file
-    python download_content.py --no-parts          # Metadata only (faster)
-    python download_content.py --verbose           # Detailed output
+    python download_content.py -w 20               # Use 20 parallel workers (faster)
+    python download_content.py -w 1                # Sequential (1 at a time)
+    python download_content.py --no-parts          # Metadata only (fastest)
 """
 
 import argparse
@@ -16,9 +17,10 @@ import hashlib
 import json
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     from tqdm import tqdm
@@ -69,7 +71,7 @@ def download_all_content(
     output_file: Optional[str] = None,
     include_parts: bool = True,
     topic_type_ids: Optional[List[str]] = None,
-    rate_limit_ms: int = 0,
+    workers: int = 10,
     verbose: bool = False
 ) -> str:
     """
@@ -79,7 +81,7 @@ def download_all_content(
         output_file: Path to output file (auto-generated if None)
         include_parts: Whether to download topic parts (content)
         topic_type_ids: Optional filter by topic type IDs
-        rate_limit_ms: Delay between API calls in milliseconds
+        workers: Number of parallel downloads (default: 10)
         verbose: Show detailed progress
 
     Returns:
@@ -124,36 +126,38 @@ def download_all_content(
         topics_dict = {}
 
         if include_parts:
-            rate_info = f", {rate_limit_ms}ms delay" if rate_limit_ms > 0 else ""
-            print(f"\nDownloading topic content{rate_info}...")
+            print(f"\nDownloading topic content ({workers} parallel workers)...")
 
-            with create_progress_bar("Downloading", len(all_topics)) as pbar:
-                for topic in all_topics:
-                    # API returns topicGuid or topicId depending on endpoint
-                    topic_id = topic.get("topicId") or topic.get("topicGuid")
-                    version_id = topic.get("topicVersionId") or topic.get("topicVersionKey")
+            def fetch_topic_parts(topic: Dict) -> Tuple[str, Dict, Dict]:
+                """Fetch parts for a single topic (runs in thread)."""
+                topic_id = topic.get("topicId") or topic.get("topicGuid")
+                version_id = topic.get("topicVersionId") or topic.get("topicVersionKey")
 
-                    if not topic_id or not version_id:
-                        logger.warning(f"Skipping topic without ID/version: {topic}")
+                if not topic_id or not version_id:
+                    return None, topic, {"error": "Missing ID/version"}
+
+                try:
+                    parts_data = client.get_topic_parts(topic_id, version_id)
+                    return topic_id, topic, parts_data
+                except Exception as e:
+                    logger.error(f"Failed to get parts for {topic_id}: {e}")
+                    return topic_id, topic, {"error": str(e)}
+
+            # Use ThreadPoolExecutor for parallel downloads
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                futures = {executor.submit(fetch_topic_parts, topic): topic for topic in all_topics}
+
+                with create_progress_bar("Downloading", len(all_topics)) as pbar:
+                    for future in as_completed(futures):
+                        topic_id, topic, parts_data = future.result()
+
+                        if topic_id:
+                            topic_entry = build_topic_entry(topic, parts_data)
+                            topics_dict[topic_id] = topic_entry
+                        else:
+                            logger.warning(f"Skipping topic without ID/version: {futures[future]}")
+
                         pbar.update(1)
-                        continue
-
-                    # Get topic parts
-                    try:
-                        parts_data = client.get_topic_parts(topic_id, version_id)
-                    except Exception as e:
-                        logger.error(f"Failed to get parts for {topic_id}: {e}")
-                        parts_data = {"error": str(e)}
-
-                    # Build topic entry
-                    topic_entry = build_topic_entry(topic, parts_data)
-                    topics_dict[topic_id] = topic_entry
-
-                    pbar.update(1)
-
-                    # Rate limiting
-                    if rate_limit_ms > 0:
-                        time.sleep(rate_limit_ms / 1000)
         else:
             print("\nSkipping parts download (--no-parts mode)...")
             for topic in all_topics:
@@ -328,11 +332,11 @@ Examples:
         help="Comma-separated topic type IDs to filter"
     )
     parser.add_argument(
-        "--rate-limit",
+        "-w", "--workers",
         type=int,
-        default=0,
-        metavar="MS",
-        help="Delay between API calls in milliseconds (default: 0, no delay)"
+        default=10,
+        metavar="N",
+        help="Number of parallel downloads (default: 10)"
     )
     parser.add_argument(
         "-v", "--verbose",
@@ -353,7 +357,7 @@ Examples:
             output_file=args.output,
             include_parts=not args.no_parts,
             topic_type_ids=topic_type_ids,
-            rate_limit_ms=args.rate_limit,
+            workers=args.workers,
             verbose=args.verbose
         )
         print(f"Success! Content exported to: {output_path}")
