@@ -41,3 +41,9 @@ env/
 
 # Debug log file
 askdelphi_debug.log
+
+# Content export/backup files (may contain sensitive data)
+content_export_*.json
+backup_*.json
+backup_before_upload_*.json
+.temp_original_*.json

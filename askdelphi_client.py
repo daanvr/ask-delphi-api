@@ -836,6 +836,151 @@ class AskDelphiClient:
         )
         return self._request("GET", endpoint)
 
+    # =========================================================================
+    # Bulk Operations (for content sync)
+    # =========================================================================
+
+    def get_all_topics(
+        self,
+        topic_type_ids: Optional[List[str]] = None,
+        page_size: int = 50,
+        progress_callback: Optional[callable] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get ALL topics with automatic pagination.
+
+        Args:
+            topic_type_ids: Optional filter by topic type IDs
+            page_size: Number of topics per API call
+            progress_callback: Optional callback(current, total) for progress
+
+        Returns:
+            List of all topic dictionaries
+        """
+        logger.info("Fetching all topics...")
+        all_topics = []
+        offset = 0
+
+        while True:
+            result = self.search_topics(
+                query="",
+                topic_type_ids=topic_type_ids,
+                limit=page_size,
+                offset=offset
+            )
+
+            items = result.get("items", result.get("data", []))
+            total = result.get("total", result.get("totalCount", 0))
+
+            all_topics.extend(items)
+
+            if progress_callback:
+                progress_callback(len(all_topics), total)
+
+            logger.debug(f"Fetched {len(all_topics)}/{total} topics")
+
+            if len(all_topics) >= total or not items:
+                break
+
+            offset += page_size
+
+        logger.info(f"Total topics fetched: {len(all_topics)}")
+        return all_topics
+
+    def get_topic_full(
+        self,
+        topic_id: str,
+        topic_version_id: str
+    ) -> Dict[str, Any]:
+        """
+        Get complete topic data including parts.
+
+        Args:
+            topic_id: Topic GUID
+            topic_version_id: Topic version GUID
+
+        Returns:
+            Complete topic data with parts
+        """
+        parts = self.get_topic_parts(topic_id, topic_version_id)
+        return {
+            "topic_id": topic_id,
+            "topic_version_id": topic_version_id,
+            "parts": parts
+        }
+
+    def is_topic_checked_out(self, topic_id: str) -> tuple:
+        """
+        Check if a topic is currently checked out.
+
+        Args:
+            topic_id: Topic GUID
+
+        Returns:
+            Tuple of (is_checked_out: bool, checked_out_by: Optional[str])
+        """
+        try:
+            state = self.get_topic_workflow_state(topic_id)
+            is_checked_out = state.get("state", "").lower() == "checkedout"
+            checked_out_by = state.get("checkedOutBy") if is_checked_out else None
+            return is_checked_out, checked_out_by
+        except Exception as e:
+            logger.warning(f"Could not get workflow state for {topic_id}: {e}")
+            return False, None
+
+    def cancel_checkout(
+        self,
+        topic_id: str,
+        topic_version_id: str
+    ) -> Dict[str, Any]:
+        """
+        Cancel a checkout (discard changes).
+
+        Args:
+            topic_id: Topic GUID
+            topic_version_id: Topic version GUID
+
+        Returns:
+            Cancel result
+        """
+        logger.info(f"Cancelling checkout: {topic_id}")
+        endpoint = (
+            f"v3/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
+            f"/topic/{topic_id}/workflowstate"
+        )
+        body = {
+            "action": "CancelCheckOut",
+            "topicVersionId": topic_version_id,
+        }
+        return self._request("POST", endpoint, json_data=body)
+
+    def update_topic_metadata(
+        self,
+        topic_id: str,
+        topic_version_id: str,
+        title: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Update topic metadata like title.
+
+        Args:
+            topic_id: Topic GUID
+            topic_version_id: Topic version GUID
+            title: New title (optional)
+
+        Returns:
+            Update result
+        """
+        logger.info(f"Updating topic metadata: {topic_id}")
+        endpoint = (
+            f"v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
+            f"/topic/{topic_id}/topicVersion/{topic_version_id}"
+        )
+        body = {}
+        if title:
+            body["title"] = title
+        return self._request("PUT", endpoint, json_data=body)
+
 
 # Example usage
 if __name__ == "__main__":

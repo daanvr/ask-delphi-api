@@ -2,3 +2,6 @@
 # Compatible met Python 3.8+
 requests>=2.28.0,<3.0.0
 python-dotenv>=1.0.0,<2.0.0
+
+# Content sync scripts
+tqdm>=4.65.0,<5.0.0          # Progress bars for download/upload
