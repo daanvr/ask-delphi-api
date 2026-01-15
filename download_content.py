@@ -126,44 +126,63 @@ def download_all_content(
         topics_dict = {}
 
         if include_parts:
-            print(f"\nDownloading topic content ({workers} parallel workers)...")
+            print(f"\nDownloading topic content & relations ({workers} parallel workers)...")
 
-            def fetch_topic_parts(topic: Dict) -> Tuple[str, Dict, Dict]:
-                """Fetch parts for a single topic (runs in thread)."""
+            def fetch_topic_data(topic: Dict) -> Tuple[str, Dict, Dict, Dict]:
+                """Fetch parts and relations for a single topic (runs in thread)."""
                 topic_id = topic.get("topicId") or topic.get("topicGuid")
                 version_id = topic.get("topicVersionId") or topic.get("topicVersionKey")
 
                 if not topic_id or not version_id:
-                    return None, topic, {"error": "Missing ID/version"}
+                    return None, topic, {"error": "Missing ID/version"}, {}
+
+                parts_data = {}
+                relations_data = {}
 
                 try:
                     parts_data = client.get_topic_parts(topic_id, version_id)
-                    return topic_id, topic, parts_data
                 except Exception as e:
                     logger.error(f"Failed to get parts for {topic_id}: {e}")
-                    return topic_id, topic, {"error": str(e)}
+                    parts_data = {"error": str(e)}
+
+                try:
+                    relations_data = client.get_topic_relations(topic_id)
+                except Exception as e:
+                    logger.debug(f"Failed to get relations for {topic_id}: {e}")
+                    relations_data = {}
+
+                return topic_id, topic, parts_data, relations_data
 
             # Use ThreadPoolExecutor for parallel downloads
             with ThreadPoolExecutor(max_workers=workers) as executor:
-                futures = {executor.submit(fetch_topic_parts, topic): topic for topic in all_topics}
+                futures = {executor.submit(fetch_topic_data, topic): topic for topic in all_topics}
 
                 with create_progress_bar("Downloading", len(all_topics)) as pbar:
                     for future in as_completed(futures):
-                        topic_id, topic, parts_data = future.result()
+                        topic_id, topic, parts_data, relations_data = future.result()
 
                         if topic_id:
-                            topic_entry = build_topic_entry(topic, parts_data)
+                            topic_entry = build_topic_entry(topic, parts_data, relations_data)
                             topics_dict[topic_id] = topic_entry
                         else:
                             logger.warning(f"Skipping topic without ID/version: {futures[future]}")
 
                         pbar.update(1)
+
+            # Build parent relationships from children
+            # (If topic A has child B, then B's parent is A)
+            print("\nBuilding parent relationships...")
+            for topic_id, topic_entry in topics_dict.items():
+                for child_id in topic_entry["relations"]["children"]:
+                    if child_id in topics_dict:
+                        if topics_dict[child_id]["relations"]["parent"] is None:
+                            topics_dict[child_id]["relations"]["parent"] = topic_id
         else:
             print("\nSkipping parts download (--no-parts mode)...")
             for topic in all_topics:
                 topic_id = topic.get("topicId") or topic.get("topicGuid")
                 if topic_id:
-                    topic_entry = build_topic_entry(topic, parts_data=None)
+                    topic_entry = build_topic_entry(topic, parts_data=None, relations_data=None)
                     topics_dict[topic_id] = topic_entry
 
     # Step 4: Build final structure
@@ -178,6 +197,7 @@ def download_all_content(
             "acl_entry_id": client.acl_entry_id,
             "topic_count": len(topics_dict),
             "includes_parts": include_parts,
+            "includes_relations": include_parts,  # Relations are fetched with parts
             "source": "askdelphi-content-download"
         },
         "content_design": {
@@ -221,7 +241,11 @@ def download_all_content(
     return str(output_path)
 
 
-def build_topic_entry(topic: Dict[str, Any], parts_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+def build_topic_entry(
+    topic: Dict[str, Any],
+    parts_data: Optional[Dict[str, Any]],
+    relations_data: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """Build a topic entry for the export JSON."""
     # API returns topicGuid or topicId depending on endpoint
     topic_id = topic.get("topicId") or topic.get("topicGuid")
@@ -240,7 +264,7 @@ def build_topic_entry(topic: Dict[str, Any], parts_data: Optional[Dict[str, Any]
         "relations": {
             "related": [],
             "children": [],
-            "parent": None
+            "parent": None  # Will be populated later by reverse lookup
         }
     }
 
@@ -248,10 +272,29 @@ def build_topic_entry(topic: Dict[str, Any], parts_data: Optional[Dict[str, Any]
     if parts_data and not parts_data.get("error"):
         entry["parts"] = extract_parts(parts_data)
 
+    # Extract relations (children) from relations data
+    if relations_data:
+        entry["relations"]["children"] = extract_child_relations(relations_data)
+
     # Calculate checksum (excluding the checksum field itself)
     entry["_checksum"] = calculate_checksum(entry)
 
     return entry
+
+
+def extract_child_relations(relations_data: Dict[str, Any]) -> List[str]:
+    """Extract child topic IDs from relations response."""
+    children = []
+
+    # Relations can be in different structures
+    relations = relations_data.get("relations", [])
+
+    for rel in relations:
+        target_id = rel.get("targetTopicId")
+        if target_id:
+            children.append(target_id)
+
+    return children
 
 
 def extract_parts(parts_data: Dict[str, Any]) -> Dict[str, Any]:

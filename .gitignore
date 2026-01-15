@@ -47,3 +47,7 @@ content_export_*.json
 backup_*.json
 backup_before_upload_*.json
 .temp_original_*.json
+
+# Generated visualization files
+hierarchy.html
+*.hierarchy.html

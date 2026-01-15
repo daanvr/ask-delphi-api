@@ -110,6 +110,27 @@ python upload_content.py content.json --original content_backup.json --dry-run
 python upload_content.py content.json --original content_backup.json
 ```
 
+### Hiërarchie visualiseren
+
+Genereer een interactieve HTML pagina om de topic hiërarchie te bekijken:
+
+```bash
+# Vanuit een bestaande export
+python visualize_hierarchy.py content_export.json
+
+# Of download en visualiseer in één stap
+python visualize_hierarchy.py --download
+
+# Specifieke output bestandsnaam
+python visualize_hierarchy.py content.json -o mijn_boom.html
+```
+
+De visualisatie toont:
+- Uitklapbare boomstructuur van parent-child relaties
+- Zoekfunctie om topics snel te vinden
+- Kleuren per topic type
+- Tags per topic
+
 ### JSON Structuur
 
 Het geëxporteerde JSON bestand heeft deze structuur:
@@ -129,6 +150,10 @@ Het geëxporteerde JSON bestand heeft deze structuur:
       "id": "topic-uuid-1",
       "title": "Mijn Topic",
       "topic_type_title": "Procedure",
+      "relations": {
+        "children": ["topic-uuid-2", "topic-uuid-3"],
+        "parent": null
+      },
       "parts": {
         "part-id": {
           "name": "Body",
@@ -187,6 +212,8 @@ topic = client.create_topic(
 | `checkin_topic(...)` | Check topic weer in |
 | `is_topic_checked_out(topic_id)` | Check of topic uitgecheckt is |
 | `cancel_checkout(...)` | Annuleer checkout |
+| `get_topic_relations(topic_id)` | Haal child-relaties (outgoing) van topic op |
+| `get_incoming_relations(...)` | Haal parent-relaties (incoming) van topic op |
 
 ---
 

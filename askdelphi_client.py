@@ -1042,6 +1042,74 @@ class AskDelphiClient:
             body["title"] = title
         return self._request("PUT", endpoint, json_data=body)
 
+    # =========================================================================
+    # Topic Relations
+    # =========================================================================
+
+    def get_topic_relations(self, topic_id: str) -> Dict[str, Any]:
+        """
+        Get outgoing relations (children) for a topic.
+
+        Args:
+            topic_id: Topic GUID
+
+        Returns:
+            Dict with 'relations' list containing child topics
+        """
+        logger.debug(f"Getting outgoing relations for: {topic_id}")
+        endpoint = (
+            f"v1/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
+            f"/topic/{topic_id}/relation"
+        )
+        return self._request("GET", endpoint)
+
+    def get_topic_relations_categorized(self, topic_id: str) -> Dict[str, Any]:
+        """
+        Get outgoing relations organized by pyramid levels.
+
+        Args:
+            topic_id: Topic GUID
+
+        Returns:
+            Dict with 'pyramidLevels' list containing hierarchical relations
+        """
+        logger.debug(f"Getting categorized relations for: {topic_id}")
+        endpoint = (
+            f"v1/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
+            f"/topic/{topic_id}/relation/categorized"
+        )
+        return self._request("GET", endpoint)
+
+    def get_incoming_relations(
+        self,
+        topic_id: str,
+        topic_version_id: str,
+        page: int = 0,
+        page_size: int = 100
+    ) -> Dict[str, Any]:
+        """
+        Get incoming relations (parents) for a topic.
+
+        Args:
+            topic_id: Topic GUID
+            topic_version_id: Topic version GUID
+            page: Page number (0-based)
+            page_size: Number of results per page
+
+        Returns:
+            Dict with 'data' containing parent topics that link to this topic
+        """
+        logger.debug(f"Getting incoming relations for: {topic_id}")
+        endpoint = (
+            f"v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
+            f"/topic/{topic_id}/topicVersion/{topic_version_id}/incomingrelations/search"
+        )
+        body = {
+            "page": page,
+            "pageSize": page_size
+        }
+        return self._request("POST", endpoint, json_data=body)
+
 
 # Example usage
 if __name__ == "__main__":
