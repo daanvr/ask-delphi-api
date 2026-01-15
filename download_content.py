@@ -128,7 +128,8 @@ def download_all_content(
 
             with create_progress_bar("Downloading", len(all_topics)) as pbar:
                 for topic in all_topics:
-                    topic_id = topic.get("topicId")
+                    # API returns topicGuid or topicId depending on endpoint
+                    topic_id = topic.get("topicId") or topic.get("topicGuid")
                     version_id = topic.get("topicVersionId") or topic.get("topicVersionKey")
 
                     if not topic_id or not version_id:
@@ -155,7 +156,7 @@ def download_all_content(
         else:
             print("\nSkipping parts download (--no-parts mode)...")
             for topic in all_topics:
-                topic_id = topic.get("topicId")
+                topic_id = topic.get("topicId") or topic.get("topicGuid")
                 if topic_id:
                     topic_entry = build_topic_entry(topic, parts_data=None)
                     topics_dict[topic_id] = topic_entry
@@ -217,17 +218,18 @@ def download_all_content(
 
 def build_topic_entry(topic: Dict[str, Any], parts_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     """Build a topic entry for the export JSON."""
-    topic_id = topic.get("topicId")
+    # API returns topicGuid or topicId depending on endpoint
+    topic_id = topic.get("topicId") or topic.get("topicGuid")
     version_id = topic.get("topicVersionId") or topic.get("topicVersionKey")
 
     entry = {
         "id": topic_id,
         "version_id": version_id,
         "title": topic.get("title") or topic.get("topicTitle"),
-        "topic_type_id": topic.get("topicTypeId"),
-        "topic_type_title": topic.get("topicTypeTitle") or topic.get("typeName"),
+        "topic_type_id": topic.get("topicTypeId") or topic.get("topicTypeKey"),
+        "topic_type_title": topic.get("topicTypeTitle") or topic.get("topicTypeName") or topic.get("typeName"),
         "created_at": topic.get("createdAt") or topic.get("created"),
-        "modified_at": topic.get("modifiedAt") or topic.get("modified"),
+        "modified_at": topic.get("modifiedAt") or topic.get("modified") or topic.get("lastModificationDate"),
         "tags": topic.get("tags", []),
         "parts": {},
         "relations": {
