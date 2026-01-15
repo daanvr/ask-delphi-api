@@ -113,12 +113,43 @@ class AskDelphiClient:
         # Exchange portal code for tokens
         print(f"Exchanging portal code for tokens...")
         url = f"{self.portal_server}api/session/registration?sessionCode={code}"
+        print(f"  URL: {url}")
 
-        response = requests.get(url)
+        try:
+            response = requests.get(url, timeout=30)
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"Network error connecting to portal: {e}")
+
+        # Debug info
+        print(f"  Status: {response.status_code}")
+        print(f"  Content-Type: {response.headers.get('Content-Type', 'unknown')}")
+
         if not response.ok:
-            raise Exception(f"Failed to exchange portal code: {response.status_code} {response.text}")
+            # Try to get error message
+            try:
+                error_text = response.text[:500]
+            except Exception:
+                error_text = f"(could not decode response)"
+            raise Exception(f"Failed to exchange portal code: {response.status_code}\n  Response: {error_text}")
 
-        data = response.json()
+        # Check if response is JSON
+        content_type = response.headers.get('Content-Type', '')
+        if 'application/json' not in content_type and 'text/json' not in content_type:
+            # Try to show what we got
+            try:
+                preview = response.text[:200]
+            except Exception:
+                preview = f"(binary data, first bytes: {response.content[:20]})"
+            raise Exception(
+                f"Expected JSON response but got Content-Type: {content_type}\n"
+                f"  Response preview: {preview}\n"
+                f"  This might mean the portal code is invalid or expired."
+            )
+
+        try:
+            data = response.json()
+        except ValueError as e:
+            raise Exception(f"Failed to parse JSON response: {e}\n  Response: {response.text[:500]}")
         self._access_token = data.get("accessToken")
         self._refresh_token = data.get("refreshToken")
         self._publication_url = data.get("url", "").rstrip("/")
