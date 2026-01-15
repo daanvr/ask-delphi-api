@@ -64,7 +64,20 @@ pip install -r requirements.txt
 
 ## Credentials Ophalen
 
-Je hebt 4 dingen nodig om de API te gebruiken:
+Je hebt 5 dingen nodig om de API te gebruiken:
+
+### 0. Server URL (belangrijk!)
+
+Als je bedrijf een eigen Ask Delphi omgeving heeft, gebruik dan die URL.
+
+Kijk naar de URL waarmee je de CMS opent:
+- `https://acme.askdelphi.com/cms/...` → gebruik `https://acme.askdelphi.com/`
+- `https://mijnbedrijf.askdelphi.com/cms/...` → gebruik `https://mijnbedrijf.askdelphi.com/`
+
+Zet dit in je `.env`:
+```env
+ASKDELPHI_PORTAL_SERVER=https://jouw-bedrijf.askdelphi.com/
+```
 
 ### 1. Tenant ID, Project ID, ACL Entry ID
 
