@@ -1,6 +1,6 @@
 # Ask Delphi API Python Client
 
-Een simpele Python client om te communiceren met de Ask Delphi Content API.
+Een Python client om te communiceren met de Ask Delphi Content API, inclusief scripts om content te downloaden en uploaden.
 
 ## Snelstart
 
@@ -8,114 +8,148 @@ Een simpele Python client om te communiceren met de Ask Delphi Content API.
 - Python 3.8 of hoger
 - UV package manager (aanbevolen) of pip
 
-### Windows
+### Installatie
 
+**Windows (PowerShell)**
 ```powershell
-# 1. Maak virtual environment
 uv venv
-
-# 2. Activeer virtual environment
 .venv\Scripts\activate
-
-# 3. Installeer dependencies
 uv pip install -r requirements.txt
-
-# 4. Kopieer credentials template
 copy .env.example .env
-# Open .env in een editor en vul je waarden in
-
-# 5. Test de connectie
-python test_api.py
 ```
 
-### macOS / Linux
-
+**macOS / Linux**
 ```bash
-# 1. Maak virtual environment
 uv venv
-
-# 2. Activeer virtual environment
 source .venv/bin/activate
-
-# 3. Installeer dependencies
 uv pip install -r requirements.txt
-
-# 4. Kopieer credentials template
 cp .env.example .env
-# Open .env in een editor en vul je waarden in
+```
 
-# 5. Test de connectie
+### Credentials Instellen
+
+Open `.env` en vul je gegevens in. **Makkelijkste optie:** plak gewoon de URL uit je browser:
+
+```env
+# Plak een URL uit de AskDelphi CMS (tenant/project/acl worden automatisch geparsed)
+ASKDELPHI_CMS_URL=https://xxx.askdelphi.com/cms/tenant/87b664f3-.../project/c7018a99-.../acl/7d712c17-.../...
+
+# Portal code uit de Mobile tab van je publicatie (eenmalig gebruik!)
+ASKDELPHI_PORTAL_CODE=ABC123-XYZ789
+```
+
+### Test de connectie
+
+```bash
 python test_api.py
 ```
 
-### Alternatief: met pip (zonder UV)
+---
+
+## Content Download & Upload Scripts
+
+### Alle content downloaden
+
+Download alle topics en content naar een JSON bestand:
 
 ```bash
-# Windows
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-
-# macOS / Linux
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+python download_content.py
 ```
 
-## Credentials Ophalen
-
-Je hebt 4 dingen nodig om de API te gebruiken:
-
-### 1. Tenant ID, Project ID, ACL Entry ID
-
-Deze vind je in de URL wanneer je ingelogd bent in de CMS:
-
-```
-https://xxx.askdelphi.com/cms/tenant/87b664f3-db62-4f9d-a008-c7f5f26928eb/project/c7018a99-8cb7-45f1-b2d4-00332ef9ecf5/acl/7d712c17-c988-4d6a-9dd0-644cc6f562a2/...
-                                    └──────────────── TENANT ID ────────────────┘        └──────────────── PROJECT ID ────────────────┘     └──────────────── ACL ENTRY ID ───────────────┘
+**Opties:**
+```bash
+python download_content.py -o backup.json      # Specifieke bestandsnaam
+python download_content.py --no-parts          # Alleen metadata (sneller)
+python download_content.py --verbose           # Gedetailleerde output
 ```
 
-### 2. Portal Code
+**Output:** `content_export_YYYYMMDD_HHMMSS.json` met alle topics, content en metadata.
 
-1. Ga naar je publicatie in AskDelphi
-2. Klik op de **Mobile** tab aan de rechterkant
-3. Je ziet een "Session code" - dit is je portal code
-4. Deze code is eenmalig en wordt omgewisseld voor tokens
+### Wijzigingen uploaden
 
-**Let op:** De portal code is tijdelijk. Na eerste gebruik wordt deze omgewisseld voor tokens die automatisch worden opgeslagen.
+Upload wijzigingen van een lokaal JSON bestand naar het platform:
 
-## Hoe Authenticatie Werkt
+```bash
+# EERST: Bekijk wat er zou veranderen (dry-run)
+python upload_content.py content_export.json --dry-run
 
-```
-Portal Code  ──GET──>  portal.askdelphi.com/api/session/registration
-                                    │
-                                    v
-                      { accessToken, refreshToken, url }
-                                    │
-                                    v
-Access Token ──GET──>  {url}/api/token/EditingApiToken
-                                    │
-                                    v
-                            API Token (JWT)
-                            (1 uur geldig)
+# DAN: Upload de wijzigingen
+python upload_content.py content_export.json
 ```
 
-De client handelt dit automatisch af:
-- Eerste keer: portal code → tokens → API token
-- Daarna: tokens worden lokaal opgeslagen en hergebruikt
-- Token verlopen? Wordt automatisch ververst
+**Opties:**
+```bash
+python upload_content.py data.json --dry-run              # Alleen tonen, niet uploaden
+python upload_content.py data.json --original backup.json # Vergelijk met specifiek bestand
+python upload_content.py data.json --no-backup            # Geen backup maken
+python upload_content.py data.json --force                # Geen bevestiging vragen
+```
 
-## Gebruik
+### Typische Workflow
+
+```bash
+# 1. Download huidige content
+python download_content.py -o content.json
+
+# 2. Maak een backup
+cp content.json content_backup.json
+
+# 3. Bewerk content.json in je favoriete editor
+#    - Wijzig topic titles
+#    - Pas content aan in de "parts" sectie
+#    - etc.
+
+# 4. Bekijk wat er veranderd is
+python upload_content.py content.json --original content_backup.json --dry-run
+
+# 5. Upload de wijzigingen
+python upload_content.py content.json --original content_backup.json
+```
+
+### JSON Structuur
+
+Het geëxporteerde JSON bestand heeft deze structuur:
+
+```json
+{
+  "_metadata": {
+    "exported_at": "2025-01-15T14:30:00Z",
+    "topic_count": 507
+  },
+  "content_design": {
+    "topic_types": [...],
+    "relations": [...]
+  },
+  "topics": {
+    "topic-uuid-1": {
+      "id": "topic-uuid-1",
+      "title": "Mijn Topic",
+      "topic_type_title": "Procedure",
+      "parts": {
+        "part-id": {
+          "name": "Body",
+          "type": "richtext",
+          "content": "<p>De content...</p>"
+        }
+      }
+    }
+  }
+}
+```
+
+---
+
+## Client API Gebruik
 
 ### Basis Voorbeeld
 
 ```python
 from askdelphi_client import AskDelphiClient
 
-# Client initialiseren
+# Client initialiseren (leest credentials uit .env)
 client = AskDelphiClient()
 
-# Authenticeren (eerste keer met portal code)
+# Authenticeren
 client.authenticate()
 
 # Topic types ophalen
@@ -123,30 +157,95 @@ design = client.get_content_design()
 for topic_type in design['topicTypes'][:5]:
     print(f"- {topic_type['title']}")
 
+# Alle topics ophalen
+topics = client.get_all_topics()
+print(f"Totaal: {len(topics)} topics")
+
 # Topic aanmaken
 topic = client.create_topic(
     title="Mijn Test Topic",
     topic_type_id="guid-van-topic-type"
 )
-print(f"Topic aangemaakt: {topic['topicId']}")
 ```
 
-### Alle Functies
+### Beschikbare Functies
 
 | Functie | Beschrijving |
 |---------|--------------|
 | `authenticate()` | Authenticeer met portal code of bestaande tokens |
 | `get_content_design()` | Haal alle topic types en relaties op |
+| `get_all_topics()` | Haal alle topics op (met automatische pagination) |
 | `search_topics(query, filters)` | Zoek topics |
 | `create_topic(title, type_id)` | Maak nieuw topic |
 | `get_topic_parts(topic_id, version_id)` | Haal content van topic op |
 | `update_topic_part(...)` | Update content van topic |
 | `checkout_topic(topic_id)` | Check topic uit om te bewerken |
 | `checkin_topic(...)` | Check topic weer in |
+| `is_topic_checked_out(topic_id)` | Check of topic uitgecheckt is |
+| `cancel_checkout(...)` | Annuleer checkout |
+
+---
+
+## Credentials Ophalen
+
+### Optie 1: CMS URL (makkelijkst)
+
+Kopieer een URL uit je browser wanneer je in de AskDelphi CMS bent:
+```
+https://xxx.askdelphi.com/cms/tenant/{TENANT_ID}/project/{PROJECT_ID}/acl/{ACL_ENTRY_ID}/...
+```
+
+Plak deze in `.env` als `ASKDELPHI_CMS_URL` - de IDs worden automatisch geparsed.
+
+### Optie 2: Losse IDs
+
+Je kunt ook de IDs apart invullen:
+```env
+ASKDELPHI_TENANT_ID=87b664f3-db62-4f9d-a008-c7f5f26928eb
+ASKDELPHI_PROJECT_ID=c7018a99-8cb7-45f1-b2d4-00332ef9ecf5
+ASKDELPHI_ACL_ENTRY_ID=7d712c17-c988-4d6a-9dd0-644cc6f562a2
+```
+
+### Portal Code
+
+1. Ga naar je publicatie in AskDelphi CMS
+2. Klik op de **Mobile** tab aan de rechterkant
+3. Kopieer de "Session code" (format: `ABC123-XYZ789`)
+
+**Let op:** Portal codes zijn **EENMALIG**! Na eerste gebruik worden ze omgewisseld voor tokens die lokaal worden opgeslagen.
+
+---
+
+## Veiligheid
+
+- Commit **NOOIT** je `.env` bestand
+- Tokens worden opgeslagen in `.askdelphi_tokens.json` (genegeerd door git)
+- Content exports worden ook genegeerd (`content_export_*.json`, `backup_*.json`)
+- Deel je portal code niet - deze geeft toegang tot je project
+
+---
+
+## Troubleshooting
+
+### "401 Unauthorized" bij portal code
+- Portal codes zijn **EENMALIG**! Haal een nieuwe op via de Mobile tab.
+
+### "0 topics" bij download
+- Check `askdelphi_debug.log` voor de API response
+- Zorg dat je de juiste ACL Entry ID hebt
+
+### "Token expired"
+- Verwijder `.askdelphi_tokens.json` en haal een nieuwe portal code op
+
+### Debugging
+Bij problemen wordt automatisch een debug log aangemaakt:
+```
+askdelphi_debug.log
+```
+
+---
 
 ## API Endpoints
-
-De client praat met deze servers:
 
 | Server | URL | Doel |
 |--------|-----|------|
@@ -155,51 +254,7 @@ De client praat met deze servers:
 
 Volledige API documentatie: https://edit.api.askdelphi.com/swagger/index.html
 
-## Veiligheid
-
-**BELANGRIJK:**
-- Commit NOOIT je `.env` bestand
-- De `.gitignore` is al geconfigureerd om `.env` te negeren
-- Tokens worden lokaal opgeslagen in `.askdelphi_tokens.json` (ook genegeerd)
-- Deel je portal code niet - deze geeft toegang tot je project
-
-## Debugging
-
-Bij problemen wordt er automatisch een uitgebreid log bestand aangemaakt:
-
-```
-askdelphi_debug.log
-```
-
-Dit bestand bevat:
-- Alle HTTP requests en responses
-- Headers en body data
-- Timestamps en error details
-
-**Tip:** Stuur dit bestand mee als je hulp nodig hebt!
-
-## Troubleshooting
-
-### "401 Unauthorized" bij portal code exchange
-- Portal codes zijn **EENMALIG**! Na gebruik werken ze niet meer.
-- Haal een nieuwe code op via de Mobile tab in je publicatie.
-- Check of je de volledige code hebt gekopieerd (format: `ABC123-XYZ789`)
-
-### "Invalid portal code"
-- De portal code is al gebruikt of verlopen.
-- Haal een nieuwe op uit de Mobile tab.
-
-### "Token expired"
-- De client zou dit automatisch moeten afhandelen.
-- Als het blijft falen: verwijder `.askdelphi_tokens.json` en haal nieuwe portal code op.
-
-### "403 Forbidden"
-- Check of je ACL Entry ID correct is.
-- Check of je gebruiker rechten heeft op het project.
-
-### "404 Not Found" bij portal
-- De portal server is altijd `https://portal.askdelphi.com`.
-- Je bedrijfs-URL (zoals `acme.askdelphi.com`) wordt automatisch opgehaald na authenticatie.
+---
 
 ## Meer Informatie
 
