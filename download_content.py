@@ -69,7 +69,7 @@ def download_all_content(
     output_file: Optional[str] = None,
     include_parts: bool = True,
     topic_type_ids: Optional[List[str]] = None,
-    rate_limit_ms: int = 100,
+    rate_limit_ms: int = 0,
     verbose: bool = False
 ) -> str:
     """
@@ -124,7 +124,8 @@ def download_all_content(
         topics_dict = {}
 
         if include_parts:
-            print(f"\nDownloading topic content (rate limit: {rate_limit_ms}ms)...")
+            rate_info = f", {rate_limit_ms}ms delay" if rate_limit_ms > 0 else ""
+            print(f"\nDownloading topic content{rate_info}...")
 
             with create_progress_bar("Downloading", len(all_topics)) as pbar:
                 for topic in all_topics:
@@ -329,9 +330,9 @@ Examples:
     parser.add_argument(
         "--rate-limit",
         type=int,
-        default=100,
+        default=0,
         metavar="MS",
-        help="Delay between API calls in milliseconds (default: 100)"
+        help="Delay between API calls in milliseconds (default: 0, no delay)"
     )
     parser.add_argument(
         "-v", "--verbose",

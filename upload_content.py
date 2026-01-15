@@ -249,7 +249,7 @@ def create_backup(client: AskDelphiClient, backup_dir: str = ".") -> str:
     download_all_content(
         output_file=str(backup_file),
         include_parts=True,
-        rate_limit_ms=50,
+        rate_limit_ms=0,
         verbose=False
     )
 
@@ -262,7 +262,7 @@ def upload_changes(
     dry_run: bool = False,
     create_backup_file: bool = True,
     force: bool = False,
-    rate_limit_ms: int = 200,
+    rate_limit_ms: int = 0,
     verbose: bool = False
 ) -> UploadReport:
     """
@@ -309,7 +309,7 @@ def upload_changes(
         download_all_content(
             output_file=temp_file,
             include_parts=True,
-            rate_limit_ms=50,
+            rate_limit_ms=0,
             verbose=False
         )
         original_data = load_json(temp_file)
@@ -523,9 +523,9 @@ Examples:
     parser.add_argument(
         "--rate-limit",
         type=int,
-        default=200,
+        default=0,
         metavar="MS",
-        help="Delay between API calls in milliseconds (default: 200)"
+        help="Delay between API calls in milliseconds (default: 0, no delay)"
     )
     parser.add_argument(
         "-v", "--verbose",
