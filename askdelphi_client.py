@@ -12,6 +12,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+from urllib.parse import urlparse
 
 import requests
 from dotenv import load_dotenv
@@ -304,11 +305,25 @@ class AskDelphiClient:
         # Extract tokens
         self._access_token = data.get("accessToken")
         self._refresh_token = data.get("refreshToken")
-        self._publication_url = data.get("url", "").rstrip("/")
+
+        # IMPORTANT: Extract only the base URL (scheme + host) from the returned URL.
+        # The portal returns a full URL with path like:
+        #   https://company.askdelphi.com/nl-NL/Project/page/eyJMMSI6...
+        # But we only need the base URL for API calls:
+        #   https://company.askdelphi.com
+        # This matches the C# implementation which does:
+        #   $"{uri.Scheme}://{uri.Host}/api/token/EditingApiToken"
+        full_url = data.get("url", "")
+        if full_url:
+            parsed = urlparse(full_url)
+            self._publication_url = f"{parsed.scheme}://{parsed.netloc}"
+        else:
+            self._publication_url = ""
 
         logger.info(f"  Received access token: {self._access_token[:20] if self._access_token else 'None'}...")
         logger.info(f"  Received refresh token: {self._refresh_token[:20] if self._refresh_token else 'None'}...")
-        logger.info(f"  Publication URL: {self._publication_url}")
+        logger.info(f"  Full URL from portal: {full_url}")
+        logger.info(f"  Extracted base URL: {self._publication_url}")
 
         if not self._access_token:
             error_msg = f"No accessToken in portal response. Response was: {data}"
@@ -420,6 +435,21 @@ class AskDelphiClient:
             logger.error(error_msg)
             raise Exception(error_msg)
 
+        # Check if we got HTML instead of JSON (indicates wrong URL)
+        content_type = response.headers.get('Content-Type', '')
+        if 'html' in content_type.lower():
+            error_msg = (
+                "Received HTML instead of JSON from EditingApiToken endpoint.\n"
+                f"  URL: {url}\n"
+                f"  Content-Type: {content_type}\n"
+                f"  This usually means the publication URL is incorrect.\n"
+                f"  The URL should be just the base domain (e.g., https://company.askdelphi.com)\n"
+                f"  Current publication URL: {self._publication_url}\n"
+                "  Try deleting .askdelphi_tokens.json and authenticating with a fresh portal code."
+            )
+            logger.error(error_msg)
+            raise Exception(error_msg)
+
         # Parse token (might be a JSON string or plain text)
         try:
             token = response.json()
@@ -430,7 +460,19 @@ class AskDelphiClient:
         except:
             token = response.text.strip().strip('"')
 
-        logger.info(f"  Received editing API token: {token[:30]}...")
+        logger.info(f"  Received editing API token: {token[:30] if len(token) > 30 else token}...")
+
+        # Validate that the token looks like a JWT
+        if not token.startswith("eyJ"):
+            error_msg = (
+                f"Invalid API token received - does not look like a JWT.\n"
+                f"  Token starts with: {token[:50]}...\n"
+                f"  Expected: eyJ... (base64 encoded JSON)\n"
+                f"  This might indicate the server returned an error page instead of a token.\n"
+                f"  Check askdelphi_debug.log for details."
+            )
+            logger.error(error_msg)
+            raise Exception(error_msg)
 
         # Parse JWT expiry
         try:
