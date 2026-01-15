@@ -715,11 +715,15 @@ class AskDelphiClient:
         Returns:
             Search results with items and pagination info
         """
-        logger.info(f"Searching topics: query='{query}', limit={limit}")
+        logger.info(f"Searching topics: query='{query}', limit={limit}, offset={offset}")
+
+        # Calculate page number from offset
+        page = offset // limit if limit > 0 else 0
+
         body = {
             "query": query,
-            "skip": offset,
-            "take": limit,
+            "page": page,
+            "pageSize": limit,
         }
         if topic_type_ids:
             body["topicTypeIds"] = topic_type_ids
@@ -918,8 +922,16 @@ class AskDelphiClient:
                 offset=offset
             )
 
-            items = result.get("items", result.get("data", []))
-            total = result.get("total", result.get("totalCount", 0))
+            # Handle different response structures
+            # API returns: { "topicList": { "result": [...], "totalAvailable": N } }
+            topic_list = result.get("topicList", {})
+            if topic_list:
+                items = topic_list.get("result", [])
+                total = topic_list.get("totalAvailable", 0)
+            else:
+                # Fallback for other response formats
+                items = result.get("items", result.get("data", result.get("result", [])))
+                total = result.get("total", result.get("totalCount", result.get("totalAvailable", 0)))
 
             all_topics.extend(items)
 
