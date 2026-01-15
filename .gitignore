@@ -38,3 +38,6 @@ env/
 
 # Token cache (may be created by the client)
 .askdelphi_tokens.json
+
+# Debug log file
+askdelphi_debug.log

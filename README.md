@@ -64,20 +64,7 @@ pip install -r requirements.txt
 
 ## Credentials Ophalen
 
-Je hebt 5 dingen nodig om de API te gebruiken:
-
-### 0. Server URL (belangrijk!)
-
-Als je bedrijf een eigen Ask Delphi omgeving heeft, gebruik dan die URL.
-
-Kijk naar de URL waarmee je de CMS opent:
-- `https://acme.askdelphi.com/cms/...` → gebruik `https://acme.askdelphi.com/`
-- `https://mijnbedrijf.askdelphi.com/cms/...` → gebruik `https://mijnbedrijf.askdelphi.com/`
-
-Zet dit in je `.env`:
-```env
-ASKDELPHI_PORTAL_SERVER=https://jouw-bedrijf.askdelphi.com/
-```
+Je hebt 4 dingen nodig om de API te gebruiken:
 
 ### 1. Tenant ID, Project ID, ACL Entry ID
 
@@ -176,18 +163,43 @@ Volledige API documentatie: https://edit.api.askdelphi.com/swagger/index.html
 - Tokens worden lokaal opgeslagen in `.askdelphi_tokens.json` (ook genegeerd)
 - Deel je portal code niet - deze geeft toegang tot je project
 
+## Debugging
+
+Bij problemen wordt er automatisch een uitgebreid log bestand aangemaakt:
+
+```
+askdelphi_debug.log
+```
+
+Dit bestand bevat:
+- Alle HTTP requests en responses
+- Headers en body data
+- Timestamps en error details
+
+**Tip:** Stuur dit bestand mee als je hulp nodig hebt!
+
 ## Troubleshooting
 
+### "401 Unauthorized" bij portal code exchange
+- Portal codes zijn **EENMALIG**! Na gebruik werken ze niet meer.
+- Haal een nieuwe code op via de Mobile tab in je publicatie.
+- Check of je de volledige code hebt gekopieerd (format: `ABC123-XYZ789`)
+
 ### "Invalid portal code"
-- De portal code is eenmalig. Haal een nieuwe op uit de Mobile tab.
+- De portal code is al gebruikt of verlopen.
+- Haal een nieuwe op uit de Mobile tab.
 
 ### "Token expired"
-- De client zou dit automatisch moeten afhandelen
-- Als het blijft falen, verwijder `.askdelphi_tokens.json` en haal nieuwe portal code op
+- De client zou dit automatisch moeten afhandelen.
+- Als het blijft falen: verwijder `.askdelphi_tokens.json` en haal nieuwe portal code op.
 
 ### "403 Forbidden"
-- Check of je ACL Entry ID correct is
-- Check of je gebruiker rechten heeft op het project
+- Check of je ACL Entry ID correct is.
+- Check of je gebruiker rechten heeft op het project.
+
+### "404 Not Found" bij portal
+- De portal server is altijd `https://portal.askdelphi.com`.
+- Je bedrijfs-URL (zoals `acme.askdelphi.com`) wordt automatisch opgehaald na authenticatie.
 
 ## Meer Informatie
 
