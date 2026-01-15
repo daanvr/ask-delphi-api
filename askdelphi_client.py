@@ -223,13 +223,16 @@ class AskDelphiClient:
         url = f"{self.PORTAL_SERVER}/api/session/registration?sessionCode={code}"
         headers = {
             "Accept": "application/json",
+            "Accept-Encoding": "gzip, deflate",  # Explicitly handle compression
             "User-Agent": "AskDelphi-Python-Client/1.0"
         }
 
         log_request("GET", url, headers)
 
         try:
-            response = requests.get(url, headers=headers, timeout=30)
+            # Use a session to handle compression properly
+            session = requests.Session()
+            response = session.get(url, headers=headers, timeout=30)
         except requests.exceptions.Timeout:
             error_msg = f"Request timed out after 30 seconds"
             logger.error(error_msg)
@@ -245,23 +248,58 @@ class AskDelphiClient:
 
         log_response(response)
 
+        # Log raw response info for debugging
+        logger.debug(f"Response encoding: {response.encoding}")
+        logger.debug(f"Response apparent_encoding: {response.apparent_encoding}")
+        logger.debug(f"Content-Encoding header: {response.headers.get('Content-Encoding', 'none')}")
+        logger.debug(f"Raw content first 100 bytes: {response.content[:100]}")
+
         if not response.ok:
             error_msg = self._format_error_response(response, "Portal code exchange")
             logger.error(error_msg)
             raise Exception(error_msg)
 
-        # Parse response
+        # Parse response - handle potential encoding issues
         try:
+            # First try the standard way
             data = response.json()
             logger.debug(f"Parsed JSON response: {json.dumps(data, indent=2)}")
-        except ValueError as e:
-            error_msg = (
-                f"Failed to parse JSON response from portal.\n"
-                f"  Content-Type: {response.headers.get('Content-Type', 'unknown')}\n"
-                f"  Response body: {response.text[:500]}"
-            )
-            logger.error(error_msg)
-            raise Exception(error_msg)
+        except (ValueError, UnicodeDecodeError) as e:
+            logger.warning(f"Standard JSON parsing failed: {e}")
+
+            # Try to decode manually with different approaches
+            try:
+                # Try decoding as utf-8 from raw content
+                text = response.content.decode('utf-8')
+                data = json.loads(text)
+                logger.debug(f"Parsed JSON via manual utf-8 decode: {json.dumps(data, indent=2)}")
+            except (UnicodeDecodeError, json.JSONDecodeError) as e2:
+                logger.warning(f"Manual utf-8 decode failed: {e2}")
+
+                # Try latin-1 (accepts any byte)
+                try:
+                    text = response.content.decode('latin-1')
+                    data = json.loads(text)
+                    logger.debug(f"Parsed JSON via latin-1 decode: {json.dumps(data, indent=2)}")
+                except json.JSONDecodeError as e3:
+                    # Log extensive debug info
+                    logger.error(f"All JSON parsing attempts failed!")
+                    logger.error(f"  Original error: {e}")
+                    logger.error(f"  UTF-8 error: {e2}")
+                    logger.error(f"  Latin-1 error: {e3}")
+                    logger.error(f"  Raw content (hex): {response.content[:200].hex()}")
+                    logger.error(f"  Raw content (repr): {repr(response.content[:200])}")
+
+                    error_msg = (
+                        f"Failed to parse JSON response from portal.\n"
+                        f"  Content-Type: {response.headers.get('Content-Type', 'unknown')}\n"
+                        f"  Content-Encoding: {response.headers.get('Content-Encoding', 'none')}\n"
+                        f"  Response encoding: {response.encoding}\n"
+                        f"  Raw bytes (first 50): {response.content[:50].hex()}\n"
+                        f"  This might indicate the response is compressed or corrupted.\n"
+                        f"  Check askdelphi_debug.log for full details."
+                    )
+                    raise Exception(error_msg)
 
         # Extract tokens
         self._access_token = data.get("accessToken")
