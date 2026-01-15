@@ -59,9 +59,13 @@ python download_content.py
 **Opties:**
 ```bash
 python download_content.py -o backup.json      # Specifieke bestandsnaam
-python download_content.py --no-parts          # Alleen metadata (sneller)
+python download_content.py -w 20               # 20 parallelle downloads (sneller)
+python download_content.py -w 1                # Sequentieel (1 tegelijk)
+python download_content.py --no-parts          # Alleen metadata (snelst)
 python download_content.py --verbose           # Gedetailleerde output
 ```
+
+Standaard worden **10 topics parallel** gedownload. Verhoog `-w` voor meer snelheid.
 
 **Output:** `content_export_YYYYMMDD_HHMMSS.json` met alle topics, content en metadata.
 
