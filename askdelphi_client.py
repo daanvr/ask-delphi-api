@@ -6,16 +6,45 @@ A Python client for the Ask Delphi Content API.
 
 import os
 import json
+import re
 import uuid
 import time
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 from urllib.parse import urlparse
 
 import requests
 from dotenv import load_dotenv
+
+
+def parse_cms_url(url: str) -> Tuple[str, str, str]:
+    """
+    Parse an Ask Delphi CMS URL and extract tenant_id, project_id, acl_entry_id.
+
+    URL format:
+    https://xxx.askdelphi.com/cms/tenant/{TENANT_ID}/project/{PROJECT_ID}/acl/{ACL_ENTRY_ID}/...
+
+    Args:
+        url: The CMS URL from the browser
+
+    Returns:
+        Tuple of (tenant_id, project_id, acl_entry_id)
+
+    Raises:
+        ValueError: If URL cannot be parsed
+    """
+    pattern = r'/tenant/([a-f0-9-]+)/project/([a-f0-9-]+)/acl/([a-f0-9-]+)'
+    match = re.search(pattern, url, re.IGNORECASE)
+
+    if not match:
+        raise ValueError(
+            f"Could not parse CMS URL: {url}\n"
+            "Expected format: https://xxx.askdelphi.com/cms/tenant/{{TENANT_ID}}/project/{{PROJECT_ID}}/acl/{{ACL_ENTRY_ID}}/..."
+        )
+
+    return match.group(1), match.group(2), match.group(3)
 
 
 # =============================================================================
@@ -113,6 +142,7 @@ class AskDelphiClient:
 
     def __init__(
         self,
+        cms_url: Optional[str] = None,
         tenant_id: Optional[str] = None,
         project_id: Optional[str] = None,
         acl_entry_id: Optional[str] = None,
@@ -123,9 +153,10 @@ class AskDelphiClient:
         Initialize the client.
 
         Args:
-            tenant_id: Your tenant ID (from CMS URL or .env)
-            project_id: Your project ID (from CMS URL or .env)
-            acl_entry_id: Your ACL entry ID (from CMS URL or .env)
+            cms_url: Full CMS URL containing tenant/project/acl IDs (easiest option)
+            tenant_id: Your tenant ID (fallback if cms_url not provided)
+            project_id: Your project ID (fallback if cms_url not provided)
+            acl_entry_id: Your ACL entry ID (fallback if cms_url not provided)
             portal_code: One-time portal code from Mobile tab (or .env)
             token_cache_file: File to cache tokens in
         """
@@ -134,10 +165,28 @@ class AskDelphiClient:
         # Load environment variables
         load_dotenv()
 
-        # Use provided values or fall back to environment
-        self.tenant_id = tenant_id or os.getenv("ASKDELPHI_TENANT_ID")
-        self.project_id = project_id or os.getenv("ASKDELPHI_PROJECT_ID")
-        self.acl_entry_id = acl_entry_id or os.getenv("ASKDELPHI_ACL_ENTRY_ID")
+        # Try to get IDs from CMS URL first (easiest option)
+        cms_url = cms_url or os.getenv("ASKDELPHI_CMS_URL")
+
+        if cms_url:
+            try:
+                parsed_tenant, parsed_project, parsed_acl = parse_cms_url(cms_url)
+                logger.info(f"  Parsed IDs from CMS URL")
+                self.tenant_id = tenant_id or parsed_tenant
+                self.project_id = project_id or parsed_project
+                self.acl_entry_id = acl_entry_id or parsed_acl
+            except ValueError as e:
+                logger.warning(f"Could not parse CMS URL: {e}")
+                # Fall back to individual variables
+                self.tenant_id = tenant_id or os.getenv("ASKDELPHI_TENANT_ID")
+                self.project_id = project_id or os.getenv("ASKDELPHI_PROJECT_ID")
+                self.acl_entry_id = acl_entry_id or os.getenv("ASKDELPHI_ACL_ENTRY_ID")
+        else:
+            # Use individual variables
+            self.tenant_id = tenant_id or os.getenv("ASKDELPHI_TENANT_ID")
+            self.project_id = project_id or os.getenv("ASKDELPHI_PROJECT_ID")
+            self.acl_entry_id = acl_entry_id or os.getenv("ASKDELPHI_ACL_ENTRY_ID")
+
         self.portal_code = portal_code or os.getenv("ASKDELPHI_PORTAL_CODE")
         self.token_cache_file = token_cache_file
 
@@ -152,11 +201,11 @@ class AskDelphiClient:
         # Validate required fields
         missing = []
         if not self.tenant_id:
-            missing.append("ASKDELPHI_TENANT_ID")
+            missing.append("ASKDELPHI_TENANT_ID (or ASKDELPHI_CMS_URL)")
         if not self.project_id:
-            missing.append("ASKDELPHI_PROJECT_ID")
+            missing.append("ASKDELPHI_PROJECT_ID (or ASKDELPHI_CMS_URL)")
         if not self.acl_entry_id:
-            missing.append("ASKDELPHI_ACL_ENTRY_ID")
+            missing.append("ASKDELPHI_ACL_ENTRY_ID (or ASKDELPHI_CMS_URL)")
 
         if missing:
             error_msg = f"Missing required credentials: {', '.join(missing)}"
