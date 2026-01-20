@@ -1119,7 +1119,7 @@ class AskDelphiClient:
 
         Args:
             topic_id: Topic GUID
-            topic_version_id: Topic version GUID (required for v2 endpoint, recommended)
+            topic_version_id: Topic version GUID (required for v2/v3 endpoints, recommended)
 
         Returns:
             Delete result
@@ -1127,14 +1127,25 @@ class AskDelphiClient:
         logger.info(f"Deleting topic: {topic_id}")
 
         if topic_version_id:
-            # Use v2 endpoint with version ID (more reliable)
-            # v2 requires a request body (DeleteTopicV2Request)
+            # Try v3 endpoint first with empty body
+            endpoint = (
+                f"v3/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
+                f"/topic/{topic_id}/topicVersion/{topic_version_id}"
+            )
+            # v3 expects DeleteTopicV3Request with optional workflowActions
+            body = {}
+            try:
+                return self._request("DELETE", endpoint, json_data=body)
+            except Exception as e:
+                logger.warning(f"v3 delete failed, trying v2: {e}")
+
+            # Fallback to v2 endpoint
             endpoint = (
                 f"v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
                 f"/topic/{topic_id}/topicVersion/{topic_version_id}"
             )
-            # Send empty body - applyWorkflowStageIds is optional/nullable
-            body = {"applyWorkflowStageIds": None}
+            # v2 expects DeleteTopicV2Request with optional workflow stage/transition ids
+            body = {}
             return self._request("DELETE", endpoint, json_data=body)
         else:
             # Fallback to v1 endpoint (may fail for some topics)
