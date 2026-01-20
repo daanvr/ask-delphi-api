@@ -164,10 +164,14 @@ def print_recent_topics_analysis(
 
     # Add timestamps to all topics and sort
     topics_with_ts = []
+    topics_without_ts = []
     for topic in all_topics:
         ts = get_topic_timestamp(topic)
         topic["_parsed_timestamp"] = ts
-        topics_with_ts.append(topic)
+        if ts:
+            topics_with_ts.append(topic)
+        else:
+            topics_without_ts.append(topic)
 
     # Sort by timestamp descending (most recent first)
     topics_with_ts.sort(
@@ -195,11 +199,27 @@ def print_recent_topics_analysis(
 
     logger.log("-" * 95)
 
+    # Show topics WITHOUT timestamp (these might be the missing ones!)
+    if topics_without_ts:
+        logger.log(f"\n{'!'*80}")
+        logger.log(f"WARNING: {len(topics_without_ts)} topics have NO TIMESTAMP!")
+        logger.log(f"These topics cannot be filtered by date and might be the missing ones:")
+        logger.log(f"{'!'*80}")
+        for i, topic in enumerate(topics_without_ts[:20]):
+            topic_id = get_topic_id(topic) or "unknown"
+            title = get_topic_title(topic)[:50]
+            logger.log(f"  {i+1}. {title:<50} ({topic_id[:8]}...)")
+        if len(topics_without_ts) > 20:
+            logger.log(f"  ... and {len(topics_without_ts) - 20} more without timestamp")
+
     # Summary
     recent_selected = sum(1 for t in topics_with_ts[:count] if get_topic_id(t) in delete_ids)
-    logger.log(f"\nIn these {count} most recent topics: {recent_selected} selected for deletion")
-    logger.log(f"Total topics in project: {len(all_topics)}")
-    logger.log(f"Total selected for deletion: {len(topics_to_delete)}")
+    logger.log(f"\nSUMMARY:")
+    logger.log(f"  Topics with timestamp: {len(topics_with_ts)}")
+    logger.log(f"  Topics WITHOUT timestamp: {len(topics_without_ts)}")
+    logger.log(f"  Total topics in project: {len(all_topics)}")
+    logger.log(f"  In top {count} recent: {recent_selected} selected for deletion")
+    logger.log(f"  Total selected for deletion: {len(topics_to_delete)}")
 
 
 def delete_topics(
