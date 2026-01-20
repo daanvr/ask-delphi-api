@@ -10,6 +10,7 @@ Usage:
 """
 
 import argparse
+import json
 import sys
 from datetime import datetime
 from typing import List, Dict, Any, Optional
@@ -17,8 +18,9 @@ from typing import List, Dict, Any, Optional
 from askdelphi_client import AskDelphiClient
 
 
-# Report file for output
+# Output files
 REPORT_FILE = "cleanup_report.txt"
+JSON_EXPORT_FILE = "cleanup_topics_dump.json"
 
 
 class Logger:
@@ -331,6 +333,20 @@ Examples:
         logger.log(f"Error: Failed to fetch topics: {e}")
         logger.close()
         sys.exit(1)
+
+    # Export raw API data to JSON for debugging
+    logger.log(f"\nExporting raw topic data to {JSON_EXPORT_FILE}...")
+    try:
+        with open(JSON_EXPORT_FILE, "w", encoding="utf-8") as f:
+            json.dump({
+                "export_timestamp": datetime.now().isoformat(),
+                "cutoff": cutoff.isoformat(),
+                "total_topics": len(all_topics),
+                "topics": all_topics
+            }, f, indent=2, default=str)
+        logger.log(f"  Exported {len(all_topics)} topics to {JSON_EXPORT_FILE}")
+    except Exception as e:
+        logger.log(f"  Warning: Failed to export JSON: {e}")
 
     # Filter topics after cutoff
     topics_to_delete = filter_topics_after_cutoff(all_topics, cutoff)
