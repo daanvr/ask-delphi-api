@@ -913,6 +913,7 @@ class AskDelphiClient:
         logger.info("Fetching all topics...")
         all_topics = []
         offset = 0
+        total = 0  # Will be updated from API response
 
         while True:
             result = self.search_topics(
@@ -938,14 +939,16 @@ class AskDelphiClient:
             if progress_callback:
                 progress_callback(len(all_topics), total)
 
-            logger.debug(f"Fetched {len(all_topics)}/{total} topics")
+            logger.debug(f"Fetched {len(all_topics)}/{total} topics (page returned {len(items)} items)")
 
-            if len(all_topics) >= total or not items:
+            # Stop ONLY when we get an empty page - don't trust totalAvailable
+            if not items:
+                logger.debug("Received empty page, stopping pagination")
                 break
 
             offset += page_size
 
-        logger.info(f"Total topics fetched: {len(all_topics)}")
+        logger.info(f"Total topics fetched: {len(all_topics)} (API reported total: {total})")
         return all_topics
 
     def get_topic_full(
