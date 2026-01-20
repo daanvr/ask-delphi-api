@@ -246,18 +246,32 @@ def delete_topics(
         topic_version_id = get_topic_version_id(topic)
         title = get_topic_title(topic)[:30]
 
+        # Check if topic is checked out (from topic list data)
+        is_locked = topic.get("isLocked", False)
+        checked_out_by_me = topic.get("checkedOutByMe", False)
+
         if not topic_id:
             logger.log(f"  [{i+1}/{total}] Skipping: {title} (no topic ID found)")
             failed += 1
             continue
 
         if dry_run:
-            logger.log(f"  [{i+1}/{total}] Would delete: {title} ({topic_id[:8]}...)")
+            locked_info = " [LOCKED]" if is_locked else ""
+            logger.log(f"  [{i+1}/{total}] Would delete: {title} ({topic_id[:8]}...){locked_info}")
             success += 1
             continue
 
         try:
-            logger.log(f"  [{i+1}/{total}] Deleting: {title}...", end=" ", flush=True)
+            # If topic is checked out, cancel the checkout first
+            if is_locked or checked_out_by_me:
+                logger.log(f"  [{i+1}/{total}] Cancelling checkout for: {title}...", end=" ", flush=True)
+                try:
+                    client.cancel_checkout(topic_id, topic_version_id)
+                    logger.log("OK, ", end="", flush=True)
+                except Exception as e:
+                    logger.log(f"(cancel failed: {e}), ", end="", flush=True)
+
+            logger.log(f"Deleting: {title}...", end=" ", flush=True)
             client.delete_topic(topic_id, topic_version_id)
             logger.log("OK")
             success += 1
