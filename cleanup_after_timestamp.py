@@ -17,6 +17,30 @@ from typing import List, Dict, Any, Optional
 from askdelphi_client import AskDelphiClient
 
 
+# Report file for output
+REPORT_FILE = "cleanup_report.txt"
+
+
+class Logger:
+    """Simple logger that writes to both console and file."""
+
+    def __init__(self, filename: str):
+        self.filename = filename
+        self.file = open(filename, "w", encoding="utf-8")
+        self.file.write(f"Cleanup Report - Generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        self.file.write("=" * 80 + "\n\n")
+
+    def log(self, message: str = "", end: str = "\n", flush: bool = False):
+        """Write to both console and file."""
+        print(message, end=end, flush=flush)
+        self.file.write(message + end)
+        if flush:
+            self.file.flush()
+
+    def close(self):
+        self.file.close()
+
+
 def parse_timestamp(timestamp_str: str) -> datetime:
     """Parse a timestamp string into a datetime object."""
     formats = [
@@ -40,32 +64,41 @@ def parse_timestamp(timestamp_str: str) -> datetime:
     )
 
 
-def get_topic_created_at(topic: Dict[str, Any]) -> Optional[datetime]:
-    """Extract creation timestamp from a topic, with fallback to modification date."""
+def get_topic_timestamp(topic: Dict[str, Any]) -> Optional[datetime]:
+    """Extract timestamp from a topic, with fallback to modification date."""
     # Try createdAt first (primary)
-    created_str = topic.get("createdAt") or topic.get("created")
+    ts_str = topic.get("createdAt") or topic.get("created")
 
     # Fallback to modifiedAt / lastModificationDate
-    if not created_str:
-        created_str = (
+    if not ts_str:
+        ts_str = (
             topic.get("modifiedAt") or
             topic.get("modified") or
             topic.get("lastModificationDate")
         )
 
-    if not created_str:
+    if not ts_str:
         return None
 
     try:
         # Handle ISO format with timezone
-        if created_str.endswith("Z"):
-            created_str = created_str[:-1]
-        if "+" in created_str:
-            created_str = created_str.split("+")[0]
+        if ts_str.endswith("Z"):
+            ts_str = ts_str[:-1]
+        if "+" in ts_str:
+            ts_str = ts_str.split("+")[0]
 
-        return datetime.fromisoformat(created_str)
+        return datetime.fromisoformat(ts_str)
     except (ValueError, TypeError):
         return None
+
+
+def get_topic_timestamp_source(topic: Dict[str, Any]) -> str:
+    """Return which field the timestamp came from."""
+    if topic.get("createdAt") or topic.get("created"):
+        return "createdAt"
+    if topic.get("modifiedAt") or topic.get("modified") or topic.get("lastModificationDate"):
+        return "lastModified"
+    return "none"
 
 
 def get_topic_id(topic: Dict[str, Any]) -> Optional[str]:
@@ -86,38 +119,91 @@ def filter_topics_after_cutoff(
     filtered = []
 
     for topic in topics:
-        created_at = get_topic_created_at(topic)
-        if created_at and created_at > cutoff:
-            topic["_parsed_created_at"] = created_at
+        ts = get_topic_timestamp(topic)
+        if ts and ts > cutoff:
+            topic["_parsed_timestamp"] = ts
             filtered.append(topic)
 
-    # Sort by creation date (oldest first)
-    filtered.sort(key=lambda t: t.get("_parsed_created_at", datetime.min))
+    # Sort by timestamp (oldest first)
+    filtered.sort(key=lambda t: t.get("_parsed_timestamp", datetime.min))
 
     return filtered
 
 
-def print_topics_preview(topics: List[Dict[str, Any]], max_display: int = 20):
+def print_topics_preview(logger: Logger, topics: List[Dict[str, Any]], max_display: int = 20):
     """Print a preview of topics that will be deleted."""
-    print(f"\nTopics to be deleted ({len(topics)} total):")
-    print("-" * 70)
+    logger.log(f"\nTopics to be deleted ({len(topics)} total):")
+    logger.log("-" * 80)
 
     for i, topic in enumerate(topics[:max_display]):
         topic_id = get_topic_id(topic) or "unknown"
         title = get_topic_title(topic)[:40]
-        created = topic.get("_parsed_created_at", "unknown")
-        if isinstance(created, datetime):
-            created = created.strftime("%Y-%m-%d %H:%M")
+        ts = topic.get("_parsed_timestamp", "unknown")
+        if isinstance(ts, datetime):
+            ts = ts.strftime("%Y-%m-%d %H:%M:%S")
 
-        print(f"  {i+1:3}. [{created}] {title:<40} ({topic_id[:8]}...)")
+        logger.log(f"  {i+1:3}. [{ts}] {title:<40} ({topic_id[:8]}...)")
 
     if len(topics) > max_display:
-        print(f"  ... and {len(topics) - max_display} more topics")
+        logger.log(f"  ... and {len(topics) - max_display} more topics")
 
-    print("-" * 70)
+    logger.log("-" * 80)
+
+
+def print_recent_topics_analysis(
+    logger: Logger,
+    all_topics: List[Dict[str, Any]],
+    topics_to_delete: set,
+    cutoff: datetime,
+    count: int = 50
+):
+    """Print the most recent topics with their timestamps and selection status."""
+    logger.log(f"\n{'='*80}")
+    logger.log(f"ANALYSIS: Last {count} topics by timestamp (cutoff: {cutoff.strftime('%Y-%m-%d %H:%M:%S')})")
+    logger.log(f"{'='*80}")
+
+    # Add timestamps to all topics and sort
+    topics_with_ts = []
+    for topic in all_topics:
+        ts = get_topic_timestamp(topic)
+        topic["_parsed_timestamp"] = ts
+        topics_with_ts.append(topic)
+
+    # Sort by timestamp descending (most recent first)
+    topics_with_ts.sort(
+        key=lambda t: t.get("_parsed_timestamp") or datetime.min,
+        reverse=True
+    )
+
+    # Get topic IDs that are selected for deletion
+    delete_ids = {get_topic_id(t) for t in topics_to_delete}
+
+    logger.log(f"\n{'#':<4} {'SELECTED':<10} {'TIMESTAMP':<20} {'SOURCE':<12} {'TITLE':<35} {'ID':<10}")
+    logger.log("-" * 95)
+
+    for i, topic in enumerate(topics_with_ts[:count]):
+        topic_id = get_topic_id(topic) or "unknown"
+        title = get_topic_title(topic)[:33]
+        ts = topic.get("_parsed_timestamp")
+        ts_str = ts.strftime("%Y-%m-%d %H:%M:%S") if ts else "NO TIMESTAMP"
+        ts_source = get_topic_timestamp_source(topic)
+
+        is_selected = topic_id in delete_ids
+        selected_str = ">> YES <<" if is_selected else "no"
+
+        logger.log(f"{i+1:<4} {selected_str:<10} {ts_str:<20} {ts_source:<12} {title:<35} {topic_id[:8]}...")
+
+    logger.log("-" * 95)
+
+    # Summary
+    recent_selected = sum(1 for t in topics_with_ts[:count] if get_topic_id(t) in delete_ids)
+    logger.log(f"\nIn these {count} most recent topics: {recent_selected} selected for deletion")
+    logger.log(f"Total topics in project: {len(all_topics)}")
+    logger.log(f"Total selected for deletion: {len(topics_to_delete)}")
 
 
 def delete_topics(
+    logger: Logger,
     client: AskDelphiClient,
     topics: List[Dict[str, Any]],
     dry_run: bool = False
@@ -133,22 +219,22 @@ def delete_topics(
         title = get_topic_title(topic)[:30]
 
         if not topic_id:
-            print(f"  [{i+1}/{total}] Skipping: {title} (no topic ID found)")
+            logger.log(f"  [{i+1}/{total}] Skipping: {title} (no topic ID found)")
             failed += 1
             continue
 
         if dry_run:
-            print(f"  [{i+1}/{total}] Would delete: {title} ({topic_id[:8]}...)")
+            logger.log(f"  [{i+1}/{total}] Would delete: {title} ({topic_id[:8]}...)")
             success += 1
             continue
 
         try:
-            print(f"  [{i+1}/{total}] Deleting: {title}...", end=" ", flush=True)
+            logger.log(f"  [{i+1}/{total}] Deleting: {title}...", end=" ", flush=True)
             client.delete_topic(topic_id)
-            print("OK")
+            logger.log("OK")
             success += 1
         except Exception as e:
-            print(f"FAILED: {e}")
+            logger.log(f"FAILED: {e}")
             failed += 1
 
     return success, failed
@@ -191,71 +277,90 @@ Examples:
 
     args = parser.parse_args()
 
+    # Initialize logger
+    logger = Logger(REPORT_FILE)
+    logger.log(f"Output is also being written to: {REPORT_FILE}")
+
     # Parse cutoff timestamp
     try:
         cutoff = parse_timestamp(args.cutoff)
-        print(f"Cutoff timestamp: {cutoff.strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.log(f"Cutoff timestamp: {cutoff.strftime('%Y-%m-%d %H:%M:%S')}")
     except ValueError as e:
-        print(f"Error: {e}")
+        logger.log(f"Error: {e}")
+        logger.close()
         sys.exit(1)
 
     # Initialize client
-    print("\nInitializing API client...")
+    logger.log("\nInitializing API client...")
     try:
         client = AskDelphiClient()
         client.authenticate()
     except Exception as e:
-        print(f"Error: Failed to authenticate: {e}")
+        logger.log(f"Error: Failed to authenticate: {e}")
+        logger.close()
         sys.exit(1)
 
     # Fetch all topics
-    print("\nFetching all topics...")
+    logger.log("\nFetching all topics...")
     try:
         all_topics = client.get_all_topics(
             progress_callback=lambda cur, tot: print(f"  Fetched {cur}/{tot} topics...", end="\r")
         )
-        print(f"  Fetched {len(all_topics)} topics total.      ")
+        logger.log(f"  Fetched {len(all_topics)} topics total.      ")
     except Exception as e:
-        print(f"Error: Failed to fetch topics: {e}")
+        logger.log(f"Error: Failed to fetch topics: {e}")
+        logger.close()
         sys.exit(1)
 
     # Filter topics after cutoff
     topics_to_delete = filter_topics_after_cutoff(all_topics, cutoff)
 
+    # Print analysis of recent topics (always, for debugging)
+    print_recent_topics_analysis(logger, all_topics, topics_to_delete, cutoff, count=50)
+
     if not topics_to_delete:
-        print(f"\nNo topics found created after {cutoff.strftime('%Y-%m-%d %H:%M:%S')}")
-        print("Nothing to delete.")
+        logger.log(f"\nNo topics found with timestamp after {cutoff.strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.log("Nothing to delete.")
+        logger.log(f"\nReport saved to: {REPORT_FILE}")
+        logger.close()
         sys.exit(0)
 
     # Show preview
-    print_topics_preview(topics_to_delete)
+    print_topics_preview(logger, topics_to_delete)
 
     # Dry run mode
     if args.dry_run:
-        print("\n[DRY RUN] No topics will be deleted.")
-        delete_topics(client, topics_to_delete, dry_run=True)
-        print(f"\n[DRY RUN] Would have deleted {len(topics_to_delete)} topics.")
+        logger.log("\n[DRY RUN] No topics will be deleted.")
+        delete_topics(logger, client, topics_to_delete, dry_run=True)
+        logger.log(f"\n[DRY RUN] Would have deleted {len(topics_to_delete)} topics.")
+        logger.log(f"\nReport saved to: {REPORT_FILE}")
+        logger.close()
         sys.exit(0)
 
     # Confirm deletion
     if not args.yes:
-        print(f"\nThis will DELETE {len(topics_to_delete)} topics!")
-        print("This action cannot be easily undone.")
+        logger.log(f"\nThis will DELETE {len(topics_to_delete)} topics!")
+        logger.log("This action cannot be easily undone.")
         confirm = input("Are you sure? Type 'yes' to confirm: ")
         if confirm.lower() != "yes":
-            print("Aborted.")
+            logger.log("Aborted.")
+            logger.log(f"\nReport saved to: {REPORT_FILE}")
+            logger.close()
             sys.exit(0)
 
     # Delete topics
-    print("\nDeleting topics...")
-    success, failed = delete_topics(client, topics_to_delete)
+    logger.log("\nDeleting topics...")
+    success, failed = delete_topics(logger, client, topics_to_delete)
 
     # Summary
-    print(f"\n{'='*50}")
-    print(f"Deletion complete!")
-    print(f"  Deleted: {success}")
-    print(f"  Failed:  {failed}")
-    print(f"{'='*50}")
+    logger.log(f"\n{'='*50}")
+    logger.log(f"Deletion complete!")
+    logger.log(f"  Deleted: {success}")
+    logger.log(f"  Failed:  {failed}")
+    logger.log(f"{'='*50}")
+
+    logger.log(f"\nReport saved to: {REPORT_FILE}")
+    logger.close()
 
     if failed > 0:
         sys.exit(1)
