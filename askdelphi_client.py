@@ -1128,17 +1128,21 @@ class AskDelphiClient:
 
         if topic_version_id:
             # Use v2 endpoint with version ID (more reliable)
+            # v2 requires a request body (DeleteTopicV2Request)
             endpoint = (
                 f"v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
                 f"/topic/{topic_id}/topicVersion/{topic_version_id}"
             )
+            # Send empty body - applyWorkflowStageIds is optional/nullable
+            body = {"applyWorkflowStageIds": None}
+            return self._request("DELETE", endpoint, json_data=body)
         else:
             # Fallback to v1 endpoint (may fail for some topics)
             endpoint = (
                 f"v1/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
                 f"/topic/{topic_id}"
             )
-        return self._request("DELETE", endpoint)
+            return self._request("DELETE", endpoint)
 
 
 # Example usage
