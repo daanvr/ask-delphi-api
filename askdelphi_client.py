@@ -1117,14 +1117,39 @@ class AskDelphiClient:
         """
         Delete (mark as deleted) a topic.
 
+        The DELETE endpoint "marks the topic as deleted and checks-in topic",
+        which means the topic must be checked out first before deletion.
+        This method automatically handles checkout before delete.
+
         Args:
             topic_id: Topic GUID
-            topic_version_id: Topic version GUID (required for v2/v3 endpoints, recommended)
+            topic_version_id: Topic version GUID (optional, will checkout if not provided)
 
         Returns:
             Delete result
         """
         logger.info(f"Deleting topic: {topic_id}")
+
+        # Step 1: Check out the topic to get a working version
+        # The DELETE endpoint requires the topic to be checked out first
+        # because it "marks as deleted and checks-in"
+        try:
+            logger.info(f"Checking out topic before delete: {topic_id}")
+            checkout_result = self.checkout_topic(topic_id)
+            # Use the new version ID from checkout
+            topic_version_id = checkout_result
+            logger.info(f"Checked out, got version: {topic_version_id}")
+        except Exception as e:
+            logger.warning(f"Checkout failed (topic may already be checked out): {e}")
+            # If checkout fails, the topic might already be checked out by us
+            # Try to get the current workflow state to get the version ID
+            if not topic_version_id:
+                try:
+                    state = self.get_topic_workflow_state(topic_id)
+                    topic_version_id = state.get("topicVersionId") or state.get("topicVersionKey")
+                    logger.info(f"Got version from workflow state: {topic_version_id}")
+                except Exception as e2:
+                    logger.warning(f"Could not get workflow state: {e2}")
 
         if topic_version_id:
             # Try v3 endpoint first with empty body

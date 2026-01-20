@@ -235,7 +235,12 @@ def delete_topics(
     topics: List[Dict[str, Any]],
     dry_run: bool = False
 ) -> tuple:
-    """Delete the specified topics. Returns (success_count, failed_count)."""
+    """Delete the specified topics. Returns (success_count, failed_count).
+
+    Note: delete_topic() now handles checkout automatically before deletion,
+    since the DELETE endpoint requires the topic to be checked out first
+    (it "marks as deleted and checks-in").
+    """
     success = 0
     failed = 0
 
@@ -243,12 +248,10 @@ def delete_topics(
 
     for i, topic in enumerate(topics):
         topic_id = get_topic_id(topic)
-        topic_version_id = get_topic_version_id(topic)
         title = get_topic_title(topic)[:30]
 
-        # Check if topic is checked out (from topic list data)
+        # Check if topic is checked out (from topic list data) - for display only
         is_locked = topic.get("isLocked", False)
-        checked_out_by_me = topic.get("checkedOutByMe", False)
 
         if not topic_id:
             logger.log(f"  [{i+1}/{total}] Skipping: {title} (no topic ID found)")
@@ -262,17 +265,9 @@ def delete_topics(
             continue
 
         try:
-            # If topic is checked out, cancel the checkout first
-            if is_locked or checked_out_by_me:
-                logger.log(f"  [{i+1}/{total}] Cancelling checkout for: {title}...", end=" ", flush=True)
-                try:
-                    client.cancel_checkout(topic_id, topic_version_id)
-                    logger.log("OK, ", end="", flush=True)
-                except Exception as e:
-                    logger.log(f"(cancel failed: {e}), ", end="", flush=True)
-
-            logger.log(f"Deleting: {title}...", end=" ", flush=True)
-            client.delete_topic(topic_id, topic_version_id)
+            logger.log(f"  [{i+1}/{total}] Deleting: {title}...", end=" ", flush=True)
+            # delete_topic() handles checkout automatically before deletion
+            client.delete_topic(topic_id)
             logger.log("OK")
             success += 1
         except Exception as e:
