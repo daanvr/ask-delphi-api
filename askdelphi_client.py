@@ -1110,6 +1110,23 @@ class AskDelphiClient:
         }
         return self._request("POST", endpoint, json_data=body)
 
+    def delete_topic(self, topic_id: str) -> Dict[str, Any]:
+        """
+        Delete (mark as deleted) a topic.
+
+        Args:
+            topic_id: Topic GUID
+
+        Returns:
+            Delete result
+        """
+        logger.info(f"Deleting topic: {topic_id}")
+        endpoint = (
+            f"v1/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
+            f"/topic/{topic_id}"
+        )
+        return self._request("DELETE", endpoint)
+
 
 # Example usage
 if __name__ == "__main__":
