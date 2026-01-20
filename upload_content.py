@@ -83,6 +83,21 @@ def load_json(file_path: str) -> Dict[str, Any]:
 
     return data
 
+### TOEGEVOEGD ###
+
+FIELDS_TO_IGNORE = {"version_id", "_checksum", "modified_at", "created_at"}
+
+def normalize_topic(topic: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove volatile fields before comparison.""" 
+    return { 
+        key: ( 
+            normalize_topic(value) if isinstance(value, dict) else value 
+            ) 
+            for key, value in topic.items() 
+            if key not in FIELDS_TO_IGNORE
+        }
+
+### TOEGEVOEGD ###
 
 def detect_changes(original: Dict[str, Any], modified: Dict[str, Any]) -> ChangeReport:
     """
@@ -107,8 +122,16 @@ def detect_changes(original: Dict[str, Any], modified: Dict[str, Any]) -> Change
             report.new_topics.append(topic_id)
         else:
             # Check if modified
-            orig_checksum = original_topics[topic_id].get("_checksum")
-            new_checksum = calculate_checksum(topic_data)
+            # orig_checksum = original_topics[topic_id].get("_checksum")
+            # new_checksum = calculate_checksum(topic_data)
+
+            ### VERVANGEN VAN REGELS HIERBOVEN ### 
+            orig_clean = normalize_topic(original_topics[topic_id]) 
+            new_clean = normalize_topic(topic_data) 
+            
+            orig_checksum = calculate_checksum(orig_clean) 
+            new_checksum = calculate_checksum(new_clean)
+            ### VERVANGEN VAN REGELS HIERBOVEN ###
 
             if orig_checksum != new_checksum:
                 # Find which parts changed
