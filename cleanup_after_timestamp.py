@@ -45,7 +45,7 @@ def get_topic_created_at(topic: Dict[str, Any]) -> Optional[datetime]:
     # Try createdAt first (primary)
     created_str = topic.get("createdAt") or topic.get("created")
 
-    # Fallback to modifiedAt
+    # Fallback to modifiedAt / lastModificationDate
     if not created_str:
         created_str = (
             topic.get("modifiedAt") or
@@ -66,6 +66,16 @@ def get_topic_created_at(topic: Dict[str, Any]) -> Optional[datetime]:
         return datetime.fromisoformat(created_str)
     except (ValueError, TypeError):
         return None
+
+
+def get_topic_id(topic: Dict[str, Any]) -> Optional[str]:
+    """Extract topic ID from a topic (handles different API response formats)."""
+    return topic.get("topicId") or topic.get("topicGuid")
+
+
+def get_topic_title(topic: Dict[str, Any]) -> str:
+    """Extract topic title from a topic (handles different API response formats)."""
+    return topic.get("topicTitle") or topic.get("title") or "Untitled"
 
 
 def filter_topics_after_cutoff(
@@ -93,8 +103,8 @@ def print_topics_preview(topics: List[Dict[str, Any]], max_display: int = 20):
     print("-" * 70)
 
     for i, topic in enumerate(topics[:max_display]):
-        topic_id = topic.get("topicId", "unknown")
-        title = topic.get("topicTitle", "Untitled")[:40]
+        topic_id = get_topic_id(topic) or "unknown"
+        title = get_topic_title(topic)[:40]
         created = topic.get("_parsed_created_at", "unknown")
         if isinstance(created, datetime):
             created = created.strftime("%Y-%m-%d %H:%M")
@@ -119,8 +129,13 @@ def delete_topics(
     total = len(topics)
 
     for i, topic in enumerate(topics):
-        topic_id = topic.get("topicId")
-        title = topic.get("topicTitle", "Untitled")[:30]
+        topic_id = get_topic_id(topic)
+        title = get_topic_title(topic)[:30]
+
+        if not topic_id:
+            print(f"  [{i+1}/{total}] Skipping: {title} (no topic ID found)")
+            failed += 1
+            continue
 
         if dry_run:
             print(f"  [{i+1}/{total}] Would delete: {title} ({topic_id[:8]}...)")
