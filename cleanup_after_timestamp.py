@@ -108,6 +108,11 @@ def get_topic_id(topic: Dict[str, Any]) -> Optional[str]:
     return topic.get("topicId") or topic.get("topicGuid")
 
 
+def get_topic_version_id(topic: Dict[str, Any]) -> Optional[str]:
+    """Extract topic version ID from a topic (handles different API response formats)."""
+    return topic.get("topicVersionId") or topic.get("topicVersionKey")
+
+
 def get_topic_title(topic: Dict[str, Any]) -> str:
     """Extract topic title from a topic (handles different API response formats)."""
     return topic.get("topicTitle") or topic.get("title") or "Untitled"
@@ -238,6 +243,7 @@ def delete_topics(
 
     for i, topic in enumerate(topics):
         topic_id = get_topic_id(topic)
+        topic_version_id = get_topic_version_id(topic)
         title = get_topic_title(topic)[:30]
 
         if not topic_id:
@@ -252,7 +258,7 @@ def delete_topics(
 
         try:
             logger.log(f"  [{i+1}/{total}] Deleting: {title}...", end=" ", flush=True)
-            client.delete_topic(topic_id)
+            client.delete_topic(topic_id, topic_version_id)
             logger.log("OK")
             success += 1
         except Exception as e:

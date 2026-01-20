@@ -1113,21 +1113,31 @@ class AskDelphiClient:
         }
         return self._request("POST", endpoint, json_data=body)
 
-    def delete_topic(self, topic_id: str) -> Dict[str, Any]:
+    def delete_topic(self, topic_id: str, topic_version_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Delete (mark as deleted) a topic.
 
         Args:
             topic_id: Topic GUID
+            topic_version_id: Topic version GUID (required for v2 endpoint, recommended)
 
         Returns:
             Delete result
         """
         logger.info(f"Deleting topic: {topic_id}")
-        endpoint = (
-            f"v1/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
-            f"/topic/{topic_id}"
-        )
+
+        if topic_version_id:
+            # Use v2 endpoint with version ID (more reliable)
+            endpoint = (
+                f"v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
+                f"/topic/{topic_id}/topicVersion/{topic_version_id}"
+            )
+        else:
+            # Fallback to v1 endpoint (may fail for some topics)
+            endpoint = (
+                f"v1/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
+                f"/topic/{topic_id}"
+            )
         return self._request("DELETE", endpoint)
 
 
