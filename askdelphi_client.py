@@ -838,7 +838,7 @@ class AskDelphiClient:
             f"/topic/{topic_id}/workflowstate"
         )
         body = {
-            "action": "CheckOut",
+            "action": 0,
         }
         result = self._request("POST", endpoint, json_data=body)
         return result.get("topicVersionId") or result.get("topicVersionKey")
@@ -866,7 +866,7 @@ class AskDelphiClient:
             f"/topic/{topic_id}/workflowstate"
         )
         body = {
-            "action": "CheckIn",
+            "action": 1,
             "topicVersionId": topic_version_id,
             "applyToDefaultStage": apply_to_default_stage,
         }
@@ -1013,7 +1013,7 @@ class AskDelphiClient:
             f"/topic/{topic_id}/workflowstate"
         )
         body = {
-            "action": "CancelCheckOut",
+            "action": 2,
             "topicVersionId": topic_version_id,
         }
         return self._request("POST", endpoint, json_data=body)

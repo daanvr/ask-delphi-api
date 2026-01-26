@@ -272,7 +272,6 @@ def create_backup(client: AskDelphiClient, backup_dir: str = ".") -> str:
     download_all_content(
         output_file=str(backup_file),
         include_parts=True,
-        rate_limit_ms=0,
         verbose=False
     )
 
@@ -332,7 +331,6 @@ def upload_changes(
         download_all_content(
             output_file=temp_file,
             include_parts=True,
-            rate_limit_ms=0,
             verbose=False
         )
         original_data = load_json(temp_file)
