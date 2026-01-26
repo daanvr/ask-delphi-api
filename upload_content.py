@@ -433,6 +433,19 @@ def upload_changes(
                 new_version_id = client.checkout_topic(topic_id)
                 print(f"  ~ Updating: {topic_data.get('title')}")
 
+                # update title if changed
+                if change.get("title_changed"):
+                    try:
+                        client.update_topic_metadata(
+                            topic_id,
+                            new_version_id,
+                            title=topic_data.get("title")
+                        )
+                        
+                        print(f'    Title updated: "{change.get("old_title")}" -> "{topic_data.get("title")}"')
+                    except Exception as e:
+                        logger.error(f"Failed to update title {e}")
+
                 # Update changed parts
                 parts_updated = 0
                 for part_change in change.get("changed_parts", []):

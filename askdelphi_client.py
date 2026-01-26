@@ -841,8 +841,37 @@ class AskDelphiClient:
             "action": 0,
         }
         result = self._request("POST", endpoint, json_data=body)
-        return result.get("topicVersionId") or result.get("topicVersionKey")
 
+        logger.info(f"Checkout response: {result}")
+
+        # try multiple possible keys for version ID
+        version_id = (
+            result.get("topicVersionId") or
+            result.get("topicVersionKey") or
+            result.get("versionId") or
+            result.get("newVersionId") or
+            result.get("workingVersionId") or
+            result.get("id")
+        )
+ 
+        # If version ID not in checkout response, get it from topic details
+        if not version_id:
+            logger.info("Version ID not in checkout response, fetching from topic details...")
+            try:
+                details = self.get_topic_details(topic_id)
+                logger.info(f"Topic details response: {details}")
+                version_id = (
+                    details.get("topicVersionId") or
+                    details.get("topicVersionKey") or
+                    details.get("workingVersionId") or
+                    details.get("versionId") or
+                    details.get("currentVersionId")
+                )
+            except Exception as e:
+                logger.warning(f"Failed to get topic details: {e}")
+ 
+        return version_id
+    
     def checkin_topic(
         self,
         topic_id: str,
@@ -886,6 +915,24 @@ class AskDelphiClient:
         endpoint = (
             f"v3/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
             f"/topic/{topic_id}/workflowstate"
+        )
+        return self._request("GET", endpoint)
+    
+    def get_topic_details(self, topic_id: str) -> Dict[str, Any]:
+        """
+        Get topic details including the current/working version ID.
+
+        Args:
+            topic_id: Topic GUID
+
+        Returns:
+            Topic details including version info
+        """
+        logger.info(f"Getting topic details: {topic_id}")
+        # Try v3 endpoint first
+        endpoint = (
+            f"v3/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
+            f"/topic/{topic_id}"
         )
         return self._request("GET", endpoint)
 
