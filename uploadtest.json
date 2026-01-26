@@ -1,0 +1,26 @@
+
+{
+  "_metadata": {
+    "exported_at": "2026-01-26T12:00:00Z",
+    "tenant_id": "0be6d42b-c278-44e6-888e-ba122840d690",
+    "project_id": "d9bae0f3-5cdf-4b63-bc8e-cc1c5564ada4",
+    "acl_entry_id": "4ecd88f2-979b-4fb0-a95d-175d499bc375",
+    "note": "Deze metadata wordt door upload_content.py niet gebruikt, maar is handig als referentie."
+  },
+  "topics": {
+    "TOPIC_GUID_1_HERE": {
+      "title": "Mijn nieuwe topic - questionnairetest2",
+      "topic_type_id": "c1225506-63e2-4785-9e51-06a587d54a9c",
+      "parts": {
+        "intro": {
+          "name": "Inleiding",
+          "content": "<p>Welkom in dit topic.</p>"
+        },
+        "body": {
+          "name": "Hoofdtekst",
+          "content": "<p>Dit is de hoofdinhoud.</p>"
+        }
+      }
+    }
+  }
+}
