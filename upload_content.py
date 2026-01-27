@@ -419,15 +419,27 @@ def upload_changes(
             version_id = topic_data.get("version_id")
 
             try:
-                # Check if already checked out
-                is_checked_out, checked_out_by = client.is_topic_checked_out(topic_id)
-                if is_checked_out:
-                    report.warnings.append({
-                        "topic_id": topic_id,
-                        "message": f"Topic already checked out by {checked_out_by}"
-                    })
-                    print(f"  ! Skipping {topic_data.get('title')}: already checked out")
-                    continue
+                # First, try to reset any existing checkout (cancel or checkin)
+                # This ensures we have a clean state before our checkout
+                try:
+                    current_version = None
+                    search_result = client.search_topics(query="", limit=1000)
+                    topic_list = search_result.get("topicList", {}).get("result", [])
+                    for t in topic_list:
+                        tid = t.get("topicGuid") or t.get("topicId")
+                        if tid == topic_id:
+                            current_version = t.get("topicVersionKey") or t.get("topicVersionId")
+                            break
+
+                    if current_version:
+                        # Try to cancel any existing checkout first
+                        try:
+                            client.cancel_checkout(topic_id, current_version)
+                            logger.info(f"Cancelled existing checkout for {topic_id}")
+                        except:
+                            pass  # Ignore if cancel fails (might not be checked out)
+                except Exception as e:
+                    logger.debug(f"Could not reset checkout state: {e}")
 
                 # Checkout
                 new_version_id = client.checkout_topic(topic_id)

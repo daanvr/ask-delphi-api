@@ -854,9 +854,46 @@ class AskDelphiClient:
             result.get("id")
         )
  
-        # If version ID not in checkout response, get it from topic details
+        # If version ID not in checkout response, get it from workflow state
         if not version_id:
-            logger.info("Version ID not in checkout response, fetching from topic details...")
+            logger.info("Version ID not in checkout response, fetching from workflow state...")
+            try:
+                state = self.get_topic_workflow_state(topic_id)
+                logger.info(f"Workflow state response: {state}")
+                # Check both top-level and nested 'data' object
+                state_data = state.get("data", state)
+                version_id = (
+                    state_data.get("topicVersionId") or
+                    state_data.get("topicVersionKey") or
+                    state_data.get("workingVersionId") or
+                    state_data.get("versionId") or
+                    state_data.get("currentVersionId") or
+                    state.get("topicVersionId") or
+                    state.get("topicVersionKey")
+                )
+            except Exception as e:
+                logger.warning(f"Failed to get workflow state: {e}")
+
+        # Try to get version from topic list search
+        if not version_id:
+            logger.info("Version ID not in workflow state, searching topic list...")
+            try:
+                # Search for this specific topic to get its current version
+                search_result = self.search_topics(query="", limit=1000)
+                topic_list = search_result.get("topicList", {}).get("result", [])
+                for topic in topic_list:
+                    # API uses topicGuid, not topicId
+                    tid = topic.get("topicGuid") or topic.get("topicId")
+                    if tid == topic_id:
+                        version_id = topic.get("topicVersionKey") or topic.get("topicVersionId")
+                        logger.info(f"Found version ID from topic list: {version_id}")
+                        break
+            except Exception as e:
+                logger.warning(f"Failed to search topics: {e}")
+
+        # Last resort: try to get from topic details
+        if not version_id:
+            logger.info("Version ID not in topic list, trying topic details...")
             try:
                 details = self.get_topic_details(topic_id)
                 logger.info(f"Topic details response: {details}")
@@ -869,7 +906,7 @@ class AskDelphiClient:
                 )
             except Exception as e:
                 logger.warning(f"Failed to get topic details: {e}")
- 
+
         return version_id
     
     def checkin_topic(
@@ -929,12 +966,20 @@ class AskDelphiClient:
             Topic details including version info
         """
         logger.info(f"Getting topic details: {topic_id}")
-        # Try v3 endpoint first
-        endpoint = (
-            f"v3/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
-            f"/topic/{topic_id}"
-        )
-        return self._request("GET", endpoint)
+
+        # Try multiple API versions
+        for version in ["v3", "v2", "v1"]:
+            endpoint = (
+                f"{version}/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
+                f"/topic/{topic_id}"
+            )
+            try:
+                return self._request("GET", endpoint)
+            except Exception as e:
+                logger.debug(f"{version} topic details failed: {e}")
+                continue
+
+        raise Exception(f"Could not get topic details for {topic_id} from any API version")
 
     # =========================================================================
     # Bulk Operations (for content sync)
@@ -1074,6 +1119,8 @@ class AskDelphiClient:
         """
         Update topic metadata like title.
 
+        The title is updated via the topic parts API, using the 'title' editor field.
+
         Args:
             topic_id: Topic GUID
             topic_version_id: Topic version GUID
@@ -1083,14 +1130,17 @@ class AskDelphiClient:
             Update result
         """
         logger.info(f"Updating topic metadata: {topic_id}")
-        endpoint = (
-            f"v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
-            f"/topic/{topic_id}/topicVersion/{topic_version_id}"
-        )
-        body = {}
+
         if title:
-            body["title"] = title
-        return self._request("PUT", endpoint, json_data=body)
+            # Title is updated via the parts API with editorFieldId 'title'
+            endpoint = (
+                f"v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
+                f"/topic/{topic_id}/topicVersion/{topic_version_id}/part/title"
+            )
+            body = {"part": {"content": title}}
+            return self._request("PUT", endpoint, json_data=body)
+
+        return {"status": "no changes"}
 
     # =========================================================================
     # Topic Relations
