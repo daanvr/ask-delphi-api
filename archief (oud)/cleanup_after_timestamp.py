@@ -15,7 +15,7 @@ import sys
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
-from askdelphi_client import AskDelphiClient
+from askdelphi_client_oud import AskDelphiClient
 
 
 # Output files

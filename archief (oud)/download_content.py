@@ -29,7 +29,7 @@ except ImportError:
     HAS_TQDM = False
     print("Note: Install 'tqdm' for progress bars: pip install tqdm")
 
-from askdelphi_client import AskDelphiClient, logger, setup_logging
+from askdelphi_client_oud import AskDelphiClient, logger, setup_logging
 
 
 def calculate_checksum(data: Dict[str, Any]) -> str:

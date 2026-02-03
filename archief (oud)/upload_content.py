@@ -27,7 +27,7 @@ try:
 except ImportError:
     HAS_TQDM = False
 
-from askdelphi_client import AskDelphiClient, logger, setup_logging
+from askdelphi_client_oud import AskDelphiClient, logger, setup_logging
 
 
 @dataclass
