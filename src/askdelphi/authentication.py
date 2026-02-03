@@ -1,3 +1,5 @@
+import re
+from typing import Tuple, Dict
 import os, json, time
 from urllib.parse import urlparse
 from pathlib import Path
@@ -5,13 +7,42 @@ from typing import Optional
 import requests
 from dotenv import load_dotenv
 
+def parse_cms_url(url: str) -> Tuple[str, str, str]:
+    pattern = r"/tenant/([a-f0-9-]+)/project/([a-f0-9-]+)/acl/([a-f0-9-]+)"
+    match = re.search(pattern, url, re.IGNORECASE)
+
+    if not match:
+        raise ValueError(
+            f"Could not parse CMS URL: {url}\n"
+            "Expected format: https://xxx.askdelphi.com/cms/tenant/{TENANT_ID}/project/{PROJECT_ID}/acl/{ACL_ENTRY_ID}/..."
+        )
+    return match.group(1), match.group(2), match.group(3)
+
+
 class AskDelphiClient:
     PORTAL_SERVER = "https://portal.askdelphi.com"
 
-    def __init__(self, portal_code: Optional[str] = None, token_cache=".askdelphi_tokens.json"):
+    def __init__(
+            self,
+            cms_url: Optional[str] = None,
+            tenant_id: Optional[str] = None,
+            project_id: Optional[str] = None,
+            acl_entry_id: Optional[str] = None,
+            portal_code: Optional[str] = None, 
+            token_cache=".askdelphi_tokens.json"
+            ):
         load_dotenv()
+        cms_url = cms_url or os.getenv("ASKDELPHI_CMS_URL")
+        if cms_url:
+            try: 
+                self.tenant_id, self.project_id, self.acl_entry_id = parse_cms_url(cms_url)
+                print("Parsed tenant/project/acl from CMS URL")
+            except ValueError:
+                print("could not find tenant/project and/or acl")
 
+        
         self.portal_code = portal_code or os.getenv("ASKDELPHI_PORTAL_CODE")
+
         self.token_cache_file = token_cache
 
         self._access_token = None
@@ -114,6 +145,89 @@ class AskDelphiClient:
 
         print("Editing API token acquired.")
         return self._api_token
+    
+    # ----------------------------------------------------------
+    # GENERIC API REQUEST
+    # ----------------------------------------------------------
+    def _request(
+        self,
+        method: str,
+        endpoint: str,
+        json_data: Optional[Dict] = None,
+        params: Optional[Dict] = None
+    ):
+        """Perform an authenticated request to the AskDelphi Editing API."""
+
+        # Ensure we have a valid editing token
+        token = self._get_api_token()
+
+        # Ensure required identifiers exist
+        for attr in ["tenant_id", "project_id", "acl_entry_id"]:
+            if not hasattr(self, attr) or getattr(self, attr) is None:
+                raise ValueError(
+                    f"{attr} is not set. Provide cms_url or explicit IDs to the constructor."
+                )
+
+        # Replace placeholders
+        path = (
+            endpoint
+            .replace("{tenantId}", self.tenant_id)
+            .replace("{projectId}", self.project_id)
+            .replace("{aclEntryId}", self.acl_entry_id)
+            .lstrip("/")
+        )
+
+        # API endpoint
+        url = f"https://edit.api.askdelphi.com/{path}"
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "AskDelphi-Python-Client/1.0"
+        }
+
+        # Debug prints
+        print("\n" + "=" * 60)
+        print(f"REQUEST: {method} {url}")
+        if params:
+            print("Params:", params)
+        if json_data:
+            print("JSON body:", json.dumps(json_data, indent=2, ensure_ascii=False)[:2000])
+
+        # Execute HTTP request
+        try:
+            response = requests.request(
+                method=method,
+                url=url,
+                headers=headers,
+                json=json_data,
+                params=params,
+                timeout=60
+            )
+        except Exception as e:
+            print("Network error:", e)
+            raise
+
+        print(f"RESPONSE: {response.status_code} {response.reason}")
+
+        # Error handling
+        if not response.ok:
+            print("Body:", response.text[:500])
+            if response.status_code == 401:
+                print("401 Unauthorized - token expired? Try authenticate() again.")
+            elif response.status_code == 403:
+                print("403 Forbidden - insufficient ACL permissions.")
+            elif response.status_code == 404:
+                print("404 Not Found - check endpoint and placeholders.")
+            raise Exception(f"API error {response.status_code}: {response.text}")
+
+        # Try JSON
+        try:
+            return response.json()
+        except Exception:
+            print("Non-JSON response returned as raw text.")
+            return {"raw": response.text}
 
     # ----------------------------------------------------------
     # TOKEN CACHE
