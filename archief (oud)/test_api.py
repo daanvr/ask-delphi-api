@@ -18,7 +18,7 @@ Usage:
 
 import sys
 import json
-from askdelphi_client import AskDelphiClient
+from askdelphi_client_oud import AskDelphiClient
 
 
 def print_header(title: str):
