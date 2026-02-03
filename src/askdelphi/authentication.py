@@ -9,7 +9,7 @@ class AskDelphiClient:
     PORTAL_SERVER = "https://portal.askdelphi.com"
 
     def __init__(self, portal_code: Optional[str] = None, token_cache=".askdelphi_tokens.json"):
-        load_dotenv()
+        load_dotenv(override=True)
 
         self.portal_code = portal_code or os.getenv("ASKDELPHI_PORTAL_CODE")
         self.token_cache_file = token_cache
