@@ -31,7 +31,7 @@ class AskDelphiClient:
             portal_code: Optional[str] = None, 
             token_cache=".askdelphi_tokens.json"
             ):
-        load_dotenv()
+        load_dotenv(override=True)
         cms_url = cms_url or os.getenv("ASKDELPHI_CMS_URL")
         if cms_url:
             try: 
