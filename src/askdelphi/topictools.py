@@ -29,4 +29,27 @@ class TopicTools:
         topic = self.client._request("POST", endpoint, json_data=data)
         
         return topic["response"]["topicId"]
+    
+    def checkin_checkout(self, topicId: str, action: int):
+        """
+        Check-in (0) of check-out (1) van een topic.
+        """
+
+        if action not in (0, 1):
+            raise ValueError("action must be 0 (check-in) or 1 (check-out)")
         
+        endpoint = f"/v1/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topicId}/workflowstate"
+        data = {
+            "action": action
+            }
+        
+        result = self.client._request("POST", endpoint, json_data=data)
+        return result
+    
+    def checkin(self, topicId: str):
+        """Voer een check-in uit"""
+        return self.checkin_checkout(topicId, 0)
+    
+    def checkout(self, topicId: str):
+        """Voer een check-out uit"""
+        return self.checkin_checkout(topicId, 1)
