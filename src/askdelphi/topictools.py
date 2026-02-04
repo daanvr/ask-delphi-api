@@ -25,4 +25,8 @@ class TopicTools:
             "topicTitle": topicTitle,
             "topicTypeId": topicTypeId
             }
-        return self.client._request("POST", endpoint, json_data=data)
+        
+        topic = self.client._request("POST", endpoint, json_data=data)
+        
+        return topic["response"]["topicId"]
+        
