@@ -63,6 +63,7 @@ class Relation:
             endpoint,
             json_data={}
         )
+        result = result.get("response", result)
         for relation in result["topicAllowedRelations"]:
             if relation["topicTypeName"] == "Taak":
                 task_relation_id = relation["relationTypeId"]
