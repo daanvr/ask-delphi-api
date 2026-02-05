@@ -28,7 +28,7 @@ class TopicTools:
         
         topic = self.client._request("POST", endpoint, json_data=data)
         
-        return topic["response"]["topicId"]
+        return topic
     
     def checkin_checkout(self, topicId: str, action: int):
         """
