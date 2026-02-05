@@ -35,18 +35,15 @@ class Project:
         topic_type_map = {}
         contentdesign = self.get_contentdesign()
         topic_types = contentdesign.get("topicTypes", [])
-        # print(f"Found {len(topic_types)} topic types:\n")
 
         for i, tt in enumerate(topic_types):
-            if tt.get("title").lower() in ["action", "task", "digitale coach procespagina"]:
-                # print(f"  {i+1}. {tt.get('title', 'Unknown')}")
-                # print(f"     ID: {tt.get('key', 'N/A')}")
-                # print(f"     Namespace: {tt.get('namespace', 'N/A')}")
-                # print()
+            if tt.get("title").lower() in [
+                "action", 
+                "task", 
+                "digitale coach procespagina", 
+                "homepage", 
+                "pagina structuur voorgedefinieerde zoekopdracht"]:
                 topic_type_map[tt.get("title")] = tt.get("key")
-
-        # print(f"topic type map:\n")
-        # print(topic_type_map)
 
         return topic_type_map
     
