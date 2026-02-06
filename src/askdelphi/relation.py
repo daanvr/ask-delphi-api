@@ -39,7 +39,7 @@ class Relation:
             }
         )
 
-    def add_tag(self, topic_id: str, topic_version_id: str, hierarchy_topic_id: str, hierarchy_node_id: str):
+    def add_tag(self, topic_id: str, topic_version_id):
         """Voeg een tag toe aan een topic."""
         endpoint = f"v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topic_id}/topicVersion/{topic_version_id}/tag"
         return self.client._request(
@@ -47,15 +47,22 @@ class Relation:
             json={
                 "tags": [
                     {
-                        "hierarchyTopicId": hierarchy_topic_id,
-                        "hierarchyNodeId": hierarchy_node_id,
+                        "tagId": "00000000-0000-0000-0000-000000000000",
+                        "enforcedByAcl": false,
+                        "isTopicListFilter": false,
+                        "hierarchyTopicId": "f80a0410-8278-4f1c-86d4-efd51804d1ec",
+                        "hierarchyTopicTitle": "Documenttype",
+                        "hierarchyNodeId": "0560fee8-7b99-4b16-b2a6-3445e410bfee",
+                        "hierarchyNodeTitle": "Digitale coach",
+                        "pathToNode": "",
+                        "hierarchyParentNodeId": "0560fee8-7b99-4b16-b2a6-3445e410bfee"
                     }
                 ]
             },
         )
 
-    def get_task_relation_id(self, topic_id: str, topicVersionId: str) -> str:
-        """Get relationship ID for task"""
+    def get_relation_type_id(self, topic_id: str, topicVersionId: str, topicTypeName: str) -> str:
+        """Get relation type ID for topicTypeName"""
         task_relation_id = ""
         endpoint = f"/v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topic_id}/topicVersion/{topicVersionId}/allowedrelations"
         result = self.client._request(
@@ -65,8 +72,8 @@ class Relation:
         )
         result = result.get("response", result)
         for relation in result["topicAllowedRelations"]:
-            if relation["topicTypeName"] == "Taak":
-                task_relation_id = relation["relationTypeId"]
+            if relation["topicTypeName"] == topicTypeName:
+                relation_type_id = relation["relationTypeId"]
                 break
 
-        return task_relation_id
+        return relation_type_id

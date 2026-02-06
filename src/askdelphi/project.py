@@ -42,7 +42,8 @@ class Project:
                 "task", 
                 "digitale coach procespagina", 
                 "homepage", 
-                "pagina structuur voorgedefinieerde zoekopdracht"]:
+                "pagina structuur voorgedefinieerde zoekopdracht",
+                "pre-defined search"]:
                 topic_type_map[tt.get("title")] = tt.get("key")
 
         return topic_type_map
