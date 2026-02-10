@@ -187,14 +187,6 @@ class AskDelphiClient:
             "User-Agent": "AskDelphi-Python-Client/1.0"
         }
 
-        # Debug prints
-        print("\n" + "=" * 60)
-        print(f"REQUEST: {method} {url}")
-        if params:
-            print("Params:", params)
-        if json_data:
-            print("JSON body:", json.dumps(json_data, indent=2, ensure_ascii=False)[:2000])
-
         # Execute HTTP request
         try:
             response = requests.request(
@@ -209,8 +201,6 @@ class AskDelphiClient:
             print("Network error:", e)
             raise
 
-        print(f"RESPONSE: {response.status_code} {response.reason}")
-
         # Error handling
         if not response.ok:
             print("Body:", response.text[:500])
@@ -222,13 +212,21 @@ class AskDelphiClient:
                 print("404 Not Found - check endpoint and placeholders.")
             raise Exception(f"API error {response.status_code}: {response.text}")
 
-        # Try JSON
         try:
-            return response.json()
-        except Exception:
+            data = response.json()
+        except ValueError:
             print("Non-JSON response returned as raw text.")
             return {"raw": response.text}
 
+
+        if isinstance(data, dict) and "success" in data:
+            if not data.get("success"):
+                error_msg = f"Api error: {data.get('errorMessage', 'Unknown error')}"
+                raise Exception(error_msg)
+            return data.get("response", data)
+        
+        return data
+    
     # ----------------------------------------------------------
     # TOKEN CACHE
     # ----------------------------------------------------------
