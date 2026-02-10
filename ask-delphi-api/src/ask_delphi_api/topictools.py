@@ -1,24 +1,14 @@
 from typing import Optional
 from ask_delphi_api.authentication import AskDelphiClient
-
-TOPIC_TYPE_IDS = {
-            "Digitale Coach Procespagina": "7d332fbb-44f5-469f-b570-874e701e526b",
-            "Stap": "c568af9a-6c89-45cf-a580-bc94e1c62ae3",
-            "Taak": "6aba8437-c8df-42d2-a868-840847c124ca"
-        }
+from ask_delphi_api.project import Project
 
 class TopicTools:
     def __init__(self, client: AskDelphiClient):
         self.client = client
+        self.project = Project(client)
 
     def topic_upload(self, topicTitle: str, topicTypeName: str):
-        topicTypeId = TOPIC_TYPE_IDS.get(topicTypeName)
-        
-        if topicTypeId is None:
-            raise ValueError(
-                f"Unknown topic type: '{topicTypeName}'."
-                f"Available types: {list(TOPIC_TYPE_IDS.keys())}"
-            )
+        topicTypeId = self.project.get_topic_type_id(topicTypeName)
         
         endpoint = "v4/tenant/{tenantId}/project/{projectId}/acl/{aclEntryId}/topic"
         data = {
