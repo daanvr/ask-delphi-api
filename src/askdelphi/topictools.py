@@ -43,7 +43,7 @@ class TopicTools:
         if action not in (0, 1):
             raise ValueError("action must be 0 (check-in) or 1 (check-out)")
         
-        endpoint = f"/v1/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topicId}/workflowstate"
+        endpoint = f"/v3/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topicId}/workflowstate"
         data = {
             "action": action
             }
