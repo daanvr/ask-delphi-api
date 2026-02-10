@@ -1,24 +1,39 @@
 from typing import Optional
-from ask_delphi_api.authentication import AskDelphiClient
-from ask_delphi_api.project import Project
+from askdelphi.authentication import AskDelphiClient
+from askdelphi.project import Project
 
 class TopicTools:
-    def __init__(self, client: AskDelphiClient):
+    def __init__(self, client: AskDelphiClient, project: Project):
         self.client = client
-        self.project = Project(client)
+        self.project = project
 
     def topic_upload(self, topicTitle: str, topicTypeName: str):
+        """Voeg een topic toe van meegegeven topictype naam."""
         topicTypeId = self.project.get_topic_type_id(topicTypeName)
-        
         endpoint = "v4/tenant/{tenantId}/project/{projectId}/acl/{aclEntryId}/topic"
         data = {
             "topicTitle": topicTitle,
             "topicTypeId": topicTypeId
             }
-        
         topic = self.client._request("POST", endpoint, json_data=data)
-        
-        return topic
+        return topic["response"]["topicId"]
+    
+    def delete_topic(self, topicId: str, topicVersionId: str):
+        """Verwijder een topic."""
+        endpoint = f"v3/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topicId}/topicVersion/{topicVersionId}"
+        data = {
+            "workflowActions": {}
+        }
+        return self.client._request("DELETE", endpoint, json_data=data)
+    
+    def get_topicVersionId(self, topicId) -> str:
+        endpoint = f"v1/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topicId}/workflowstate"
+        data={
+            "action": 1
+        }
+        result = self.client._request("POST", endpoint, json_data=data)
+        result = result.get("response", result)
+        return result["topicVersionId"]
     
     def checkin_checkout(self, topicId: str, action: int):
         """
@@ -28,7 +43,7 @@ class TopicTools:
         if action not in (0, 1):
             raise ValueError("action must be 0 (check-in) or 1 (check-out)")
         
-        endpoint = f"/v1/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topicId}/workflowstate"
+        endpoint = f"/v3/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topicId}/workflowstate"
         data = {
             "action": action
             }
@@ -43,4 +58,3 @@ class TopicTools:
     def checkout(self, topicId: str):
         """Voer een check-out uit"""
         return self.checkin_checkout(topicId, 1)
-        

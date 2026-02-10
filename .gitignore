@@ -3,6 +3,10 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# MAC specifiek
+.DS_Store
+.vscode
+
 # C extensions
 *.so
 

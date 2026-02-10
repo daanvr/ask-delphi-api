@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Matthijs M.H.J. Neutelings", email = "mhj.neutelings@belastingdienst.nl" }
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.9"
 dependencies = [
     "python-dotenv>=1.2.1",
     "requests>=2.32.5",
@@ -18,5 +18,5 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-    "ipykernel>=7.1.0",
+    "ipykernel>=6.31.0",
 ]
