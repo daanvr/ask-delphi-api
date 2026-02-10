@@ -3,6 +3,7 @@ from askdelphi.authentication import AskDelphiClient
 from askdelphi.project import Project
 
 class TopicTools:
+    
     def __init__(self, client: AskDelphiClient, project: Project):
         self.client = client
         self.project = project

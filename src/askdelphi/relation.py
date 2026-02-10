@@ -39,27 +39,11 @@ class Relation:
             }
         )
 
-    def add_tag(self, topic_id: str, topic_version_id):
+    def add_tag(self, topic_id: str, topic_version_id: str, hierarchyNodeTitle: str):
         """Voeg een tag toe aan een topic."""
-        endpoint = f"v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topic_id}/topicVersion/{topic_version_id}/tag"
-        return self.client._request(
-            endpoint,
-            json={
-                "tags": [
-                    {
-                        "tagId": "00000000-0000-0000-0000-000000000000",
-                        "enforcedByAcl": false,
-                        "isTopicListFilter": false,
-                        "hierarchyTopicId": "f80a0410-8278-4f1c-86d4-efd51804d1ec",
-                        "hierarchyTopicTitle": "Documenttype",
-                        "hierarchyNodeId": "0560fee8-7b99-4b16-b2a6-3445e410bfee",
-                        "hierarchyNodeTitle": "Digitale coach",
-                        "pathToNode": "",
-                        "hierarchyParentNodeId": "0560fee8-7b99-4b16-b2a6-3445e410bfee"
-                    }
-                ]
-            },
-        )
+        tag_data = self.get_tag_data(topic_id, topic_version_id, hierarchyNodeTitle)
+        endpoint = f"/v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topic_id}/topicVersion/{topic_version_id}/tag"
+        return self.client._request("POST", endpoint, json_data={"tags": [tag_data]})
 
     def get_relation_type_id(self, topic_id: str, topicVersionId: str, topicTypeName: str) -> str:
         """Get relation type ID for topicTypeName"""
@@ -77,3 +61,15 @@ class Relation:
                 break
 
         return relation_type_id
+    
+    def get_tag_data(self, topicId: str, topicVersionId: str, hierarchyNodeTitle: str):
+        endpoint = f"/v1/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topicId}/topicVersion/{topicVersionId}/editortagmodel"
+        response = self.client._request("GET", endpoint)
+        response = response.get("response", response)
+
+        tag_data = {}
+        for tag in response['data']['projectTags']:
+            if tag["hierarchyNodeTitle"].lower() == hierarchyNodeTitle:
+                tag_data = tag
+                break
+        return tag_data
