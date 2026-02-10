@@ -15,7 +15,7 @@ class Workflow:
             "Url": "https://digitalecoach.askdelphi.com/cms/tenant/0be6d42b-c278-44e6-888e-ba122840d690/project/397296f6-20dd-45cd-8459-250db2725140/acl/4ecd88f2-979b-4fb0-a95d-175d499bc375"
         }
         result = self.client._request("POST", endpoint, json_data=data)
-        result = result.get("response", result)
+        # result = result.get("response", result)
         request_id = result["workflowTransitionRequestId"]
 
         return request_id
@@ -27,7 +27,7 @@ class Workflow:
         endpoint = f"v1/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/workflow-transition-request/{request_id}/transitions"
         data={}
         result = self.client._request("GET", endpoint, json_data=data)
-        result = result.get("response", result)
+        # result = result.get("response", result)
         return result
     
     def extract_steps(self, transitions_model):
@@ -58,7 +58,7 @@ class Workflow:
         endpoint = f"v1/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/workflow-transition-request/{request_id}/transitions"
         data={}
         result = self.client._request("PUT", endpoint, json_data={"data": steps})
-        result = result.get("response", result)
+        # result = result.get("response", result)
         return result
     
     def approve_workflow_transition_request(self, request_id : str) -> str:
@@ -73,7 +73,7 @@ class Workflow:
              "effectiveDate": effectiveDate
         }
         result = self.client._request("POST", endpoint, json_data=data)
-        result = result.get("response", result)
+        # result = result.get("response", result)
         return result
     
    

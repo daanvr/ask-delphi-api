@@ -1,8 +1,9 @@
 from typing import Optional
-from askdelphi.authentication import AskDelphiClient
-from askdelphi.project import Project
+from ask_delphi_api.authentication import AskDelphiClient
+from ask_delphi_api.project import Project
 
 class TopicTools:
+    
     def __init__(self, client: AskDelphiClient, project: Project):
         self.client = client
         self.project = project
@@ -16,7 +17,7 @@ class TopicTools:
             "topicTypeId": topicTypeId
             }
         topic = self.client._request("POST", endpoint, json_data=data)
-        return topic["response"]["topicId"]
+        return topic["topicId"]
     
     def delete_topic(self, topicId: str, topicVersionId: str):
         """Verwijder een topic."""
@@ -32,7 +33,6 @@ class TopicTools:
             "action": 1
         }
         result = self.client._request("POST", endpoint, json_data=data)
-        result = result.get("response", result)
         return result["topicVersionId"]
     
     def checkin_checkout(self, topicId: str, action: int):
