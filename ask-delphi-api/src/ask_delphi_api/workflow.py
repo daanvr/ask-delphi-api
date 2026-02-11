@@ -12,7 +12,10 @@ class Workflow:
         """
         endpoint = f"v1/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/workflow-transition-request/topic/{topic_id}"
         data={
-            "Url": "https://digitalecoach.askdelphi.com/cms/tenant/0be6d42b-c278-44e6-888e-ba122840d690/project/397296f6-20dd-45cd-8459-250db2725140/acl/4ecd88f2-979b-4fb0-a95d-175d499bc375"
+            "Url": f"https://digitalecoach.askdelphi.com/cms/"
+                   f"tenant/{self.client.tenant_id}/"
+                   f"project/{self.client.project_id}/"
+                   f"acl/{self.client.acl_entry_id}"
         }
         result = self.client._request("POST", endpoint, json_data=data)
         # result = result.get("response", result)
