@@ -1,12 +1,29 @@
-from typing import Optional
+from typing import Optional, Dict
 from ask_delphi_api.authentication import AskDelphiClient
 from ask_delphi_api.project import Project
+import pprint
 
 class TopicTools:
     
     def __init__(self, client: AskDelphiClient, project: Project):
         self.client = client
         self.project = project
+
+    def get_topic_parts(self, topicId: str):
+        """Haal alle parts op van topic met topicId."""
+        endpoint = f"/v3/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topicId}/part"
+        data = {}
+        topic = self.client._request("GET", endpoint, json_data=data)
+        return topic
+    
+    def topic_add_content(self, topicVersionId: str, topicId: str, partId: str, part: Dict, new_text: str):
+        """Voeg content toe aan topic met topicId."""
+        endpoint = f"/v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topicId}/topicVersion/{topicVersionId}/part/{partId}"
+        part['editors'][0]['value']['richTextEditor'] = {'value': new_text }
+        pprint.pp(part)
+        json_data = {"part": part}
+        topic = self.client._request("PUT", endpoint, json_data=json_data)
+        return topic
 
     def topic_upload(self, topicTitle: str, topicTypeName: str):
         """Voeg een topic toe van meegegeven topictype naam."""
