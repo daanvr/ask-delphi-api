@@ -1,6 +1,7 @@
 from typing import Optional, Dict
 from ask_delphi_api.authentication import AskDelphiClient
 from ask_delphi_api.project import Project
+import pprint
 
 class TopicTools:
     
@@ -18,7 +19,15 @@ class TopicTools:
     def topic_add_content(self, topicVersionId: str, topicId: str, partId: str, part: Dict, new_text: str):
         """Voeg content toe aan topic met topicId."""
         endpoint = f"/v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topicId}/topicVersion/{topicVersionId}/part/{partId}"
-        part['editors'][0]['value']['richTextEditor']['value'] = new_text
+        part['editors'][0]['value']['richTextEditor'] = {'value': new_text }
+        json_data = {"part": part}
+        topic = self.client._request("PUT", endpoint, json_data=json_data)
+        return topic
+    
+    def topic_add_link(self, topicVersionId: str, topicId: str, partId: str, part: Dict, new_text: str):
+        """Voeg contentlink toe aan topic met topicId."""
+        endpoint = f"/v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topicId}/topicVersion/{topicVersionId}/part/{partId}"
+        part['editors'][0]['value']['string'] = {'markup': None, 'value': new_text }
         json_data = {"part": part}
         topic = self.client._request("PUT", endpoint, json_data=json_data)
         return topic
