@@ -1,4 +1,5 @@
 from typing import Optional, Dict
+from datetime import datetime
 from ask_delphi_api.authentication import AskDelphiClient
 from ask_delphi_api.project import Project
 import pprint
@@ -82,3 +83,73 @@ class TopicTools:
     def checkout(self, topicId: str):
         """Voer een check-out uit"""
         return self.checkin_checkout(topicId, 1)
+    
+    def parse_iso_ts(self, s: Optional[str]):
+        """
+        Maakt alle timestamp formaten netjes leesbaar
+        """
+        if not s:
+            return None
+        s = s.replace("Z", "")
+        if "+" in s:
+            s = s.split("+", 1)[0]
+        try:
+            return datetime.fromisoformat(s)
+        except:
+            return None
+        
+    def fetch_topiclist(self, page_size=100):
+        """
+        Haalt de gegevens van alle topics op. Stopt wanneer een pagina geen resultaten meer bevat. 
+        Retourneert een list van topic dicts.
+        """
+        endpoint = "/v1/tenant/{tenantId}/project/{projectId}/acl/{aclEntryId}/topiclist"
+        all_topics = []
+        page = 0
+
+        while True:
+            body = {"query": "", 
+                    "page": page, 
+                    "pageSize": page_size
+            }
+            resp = self.client._request("POST", endpoint, json_data=body)
+
+            topic_list = resp.get("topicList", {})
+            if topic_list:
+                items = topic_list.get("result", [])
+            else:
+                items = resp.get("items", resp.get("data", []))
+
+            if not items:
+                break
+
+            all_topics.extend(items)
+            page += 1
+            
+        return all_topics
+
+    def filter_between(self, start_str: str, end_str: str):
+        """
+        Filteren op basis van timestamp
+        """
+        start = datetime.fromisoformat(start_str.replace("Z", ""))
+        end = datetime.fromisoformat(end_str.replace("Z", ""))
+
+        topics = self.fetch_topiclist()
+
+        selected = []
+        for t in topics:
+            ts_str = t.get("lastModificationDate")
+            ts = self.parse_iso_ts(ts_str)
+            if not ts:
+                continue
+
+            if start <= ts <= end:
+                selected.append({
+                    "topicGuid": t.get("topicGuid"),
+                    "title": t.get("title"),
+                    "LastModificationDate": ts_str
+                })
+
+        selected.sort(key=lambda x: self.parse_iso_ts(x["LastModificationDate"]))
+        return selected
