@@ -62,6 +62,24 @@ class Relation:
 
         return relation_type_id
     
+    def get_relationTypeId_by_relationTypeName(self, topic_id_action : str, topic_version_id_action: str, relationTypeName: str) -> str:
+        endpoint = f"/v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topic_id_action}/topicVersion/{topic_version_id_action}/allowedrelations"
+        result = self.client._request(
+            "GET", 
+            endpoint,
+            json_data={}
+        )
+
+        relationTypeId = ""
+        for item in result["topicAllowedRelations"]:
+            # print(item)
+            if item['relationTypeName'] == relationTypeName:
+                print(f"{item['relationTypeName']} => relationTypeId {item["relationTypeId"]}")
+                relationTypeId = item["relationTypeId"]
+                break
+        
+        return relationTypeId
+    
     def get_tag_data(self, topicId: str, topicVersionId: str, hierarchyNodeTitle: str):
         endpoint = f"/v1/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topicId}/topicVersion/{topicVersionId}/editortagmodel"
         response = self.client._request("GET", endpoint)
