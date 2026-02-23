@@ -16,7 +16,7 @@ class Relation:
             }
         )
 
-    def add_topic_with_relation(self, client: AskDelphiClient, topicId: str, topicTitle: str, topicTypeId: str, parentTopicId: str, parentTopicRelationTypeId: str, parentTopicVersionId: str):
+    def add_topic_with_relation(self, topicId: str, topicTitle: str, topicTypeId: str, parentTopicId: str, parentTopicRelationTypeId: str, parentTopicVersionId: str):
         """Voeg een topic met een relatie naar andere topic toe.  
         Args:        
         - topicId (str): ID van het doel-topic.        

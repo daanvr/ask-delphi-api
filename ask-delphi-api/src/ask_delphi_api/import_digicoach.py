@@ -22,6 +22,13 @@ class Import:
 
     def _get_topic(self):
         return self.topic
+    
+    def create_link(self, description: str, topicId: str) -> str:
+        target = f"target=\"{topicId}\" use=\"default\" view=\"default\""
+        thumbnail= "" 
+        link = f"link=\"tenant/{self.client.tenant_id}/project/{self.client.project_id}/acl/{self.client.acl_entry_id}/topic/{topicId}/edit"
+        doppio_link = f"<doppio-link {target} title=\"{description}\" {thumbnail} {link}>{description}</doppio-link>"
+        return doppio_link
         
     # Create Voorgedefinieerde zoekopdracht topic
     def create_voorgedefinieerde_zoekopdracht_topic(self, name: str) -> str:
@@ -38,7 +45,7 @@ class Import:
         parentTopicId = topic_id_predefined_search
         parentTopicRelationTypeId = self.relation.get_relation_type_id(topic_id_predefined_search, topic_version_id_predefined_search,"Voorgedefinieerde zoekopdracht")
         parentTopicVersionId = topic_version_id_predefined_search
-        self.relation.add_topic_with_relation(self.client, topic_id_digicoach, topicTitle, topicTypeId, parentTopicId, parentTopicRelationTypeId, parentTopicVersionId)
+        self.relation.add_topic_with_relation(topic_id_digicoach, topicTitle, topicTypeId, parentTopicId, parentTopicRelationTypeId, parentTopicVersionId)
         print(f"Created Digicoach topic : {topic_id_digicoach}")
         topic_version_id_digicoach = self.topic.get_topicVersionId(topic_id_digicoach)
         return topic_id_digicoach, topic_version_id_digicoach
@@ -57,7 +64,7 @@ class Import:
         parentTopicId = topic_id_digicoach
         parentTopicRelationTypeId = self.relation.get_relation_type_id(topic_id_digicoach, topic_version_id_digicoach, "Taak")
         parentTopicVersionId = topic_version_id_digicoach
-        self.relation.add_topic_with_relation(self.client, topic_id_task, topicTitle, topicTypeId, parentTopicId, parentTopicRelationTypeId, parentTopicVersionId)
+        self.relation.add_topic_with_relation(topic_id_task, topicTitle, topicTypeId, parentTopicId, parentTopicRelationTypeId, parentTopicVersionId)
         print(f"Created Task topic : {topic_id_task}")
         topic_version_id_task = self.topic.get_topicVersionId(topic_id_task)
         return topic_id_task, topic_version_id_task
@@ -70,28 +77,61 @@ class Import:
         parentTopicId = topic_id_task
         parentTopicRelationTypeId = self.relation.get_relation_type_id(topic_id_task, topic_version_id_task, "Stap")
         parentTopicVersionId = topic_version_id_task
-        self.relation.add_topic_with_relation(self.client, topic_id_step, topicTitle, topicTypeId, parentTopicId, parentTopicRelationTypeId, parentTopicVersionId)
+        self.relation.add_topic_with_relation(topic_id_step, topicTitle, topicTypeId, parentTopicId, parentTopicRelationTypeId, parentTopicVersionId)
         print(f"Created Action topic : {topic_id_step}")
         topic_version_id_step = self.topic.get_topicVersionId(topic_id_step)
         return topic_id_step, topic_version_id_step
     
-    def add_content_to_topic(self, topicId: str, topicVerionId: str, text: str):
+    # Create source topic
+    def add_source(self, topic_id: str, topic_version_id: str, source: dict) -> str:
+
+        # RelationTypeId uitvragen
+        parentTopicId = topic_id
+        parentTopicVersionId = topic_version_id
+        parentTopicRelationTypeId = self.relation.get_relationTypeId_by_relationTypeName(topic_id, topic_version_id, "Handleidingen en instructies")
+
+        # Creatie source topic
+        topic_id_source = str(uuid.uuid4())
+        topic_title_source = source["titel"]   
+        topic_type_id_source = self.project.get_topic_type_id("External URL")
+
+        # Toevoegen source topic
+        self.relation.add_topic_with_relation(topic_id_source, topic_title_source, topic_type_id_source, parentTopicId, parentTopicRelationTypeId, parentTopicVersionId)
+
+        # Update source topic
+        topic_version_id_source = self.topic.get_topicVersionId(topic_id_source)
+        self.add_link_to_topic(topic_id_source, topic_version_id_source, source["link"])
+
+        return topic_id_source, topic_version_id_source
+    
+    def add_content_to_topic(self, topicId: str, topicVersionId: str, text: str):
         content = self.topic.get_topic_parts(topicId=topicId)
 
         # Selecteer part uit topic met daarin de content.
-        part = content['topicEditorData']['groups'][1]['parts'][0]
-
-        # Checkout topic.
-        result = self.topic.checkout(topicId)
-
-        # Selecteer huidig topicVersionId.
-        topicVersionId = result['topicVersionId']
+        body_part = None
+        groups = content['topicEditorData']['groups']
+        for group in groups:
+            for part in group['parts']:
+                if part["partId"] == "body":
+                    body_part = part
 
         # Pas content topic aan.
-        self.topic.topic_add_content(topicVersionId=topicVersionId, topicId=topicId, partId="body", part=part, new_text=f'<p>{text}</p>')
+        self.topic.topic_add_content(topicVersionId=topicVersionId, topicId=topicId, partId="body", part=body_part, new_text=text)
 
-        # Checkin topic.
-        self.topic.checkin(topicId)
+    def add_link_to_topic(self, topicId: str, topicVersionId: str, url: str):
+        content = self.topic.get_topic_parts(topicId=topicId)
+
+        # Selecteer part uit topic met daarin de content.
+        body_part = None
+        groups = content['topicEditorData']['groups']
+        for group in groups:
+            for part in group['parts']:
+                if part["defaultLabel"] == "Link metadata":
+                    body_part = part
+
+        # Pas content topic aan.
+        self.topic.topic_add_link(topicVersionId=topicVersionId, topicId=topicId, partId="link-meta-data", part=body_part, new_text=url)
+
 
     #  Creates a workflow transition request for predefined_search topic.
     def publiceer(self, topic_id: str):
