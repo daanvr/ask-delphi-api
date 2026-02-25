@@ -197,7 +197,7 @@ class Import:
         # Externe linkjes waarvan de titel voorkomt in de text detecteren
         for source in sources:
             # print(f"{source["titel"]}, {source["type"]}, {source["link"]}")
-            if source["titel"].lower() in text.lower():
+            if source["titel"] in text:
                 topic_id_link = self.link_list[source["titel"]]
                 topic_id_links.append(topic_id_link)
 
@@ -245,10 +245,11 @@ class Import:
                     body_part = part
 
         # Interne en externe links
-        text = self.hyperlink_html(text) 
+        text_hyperlink = self.hyperlink_html(text)
+        # print(text_hyperlink)
 
         # Pas content topic aan.
-        self.topic.topic_add_content(topicVersionId=topicVersionId, topicId=topicId, partId="body", part=body_part, new_text=text)
+        self.topic.topic_add_content(topicVersionId=topicVersionId, topicId=topicId, partId="body", part=body_part, new_text=text_hyperlink)
 
     def add_link_to_topic(self, topicId: str, topicVersionId: str, url: str):
         content = self.topic.get_topic_parts(topicId=topicId)
