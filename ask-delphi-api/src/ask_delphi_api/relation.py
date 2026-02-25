@@ -4,16 +4,16 @@ class Relation:
     def __init__(self, client: AskDelphiClient):
         self.client = client
 
-    def add_relation(self, topic_id: str, topic_version_id: str, relation_type_id: str, target_topic_id: str):
+    def add_relation(self, sourceTopicId: str, sourceTopicVersionId: str, relationTypeId: str, targetTopicId: str):
         """Voeg een relatie toe van dit topic naar andere topics."""
-        endpoint = "v2/tenant/{tenantId}/project/{projectId}/acl/{aclEntryId}/topic/{topic_id}/topicVersion/{topic_version_id}/relation"
+        endpoint = f"v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{sourceTopicId}/topicVersion/{sourceTopicVersionId}/relation"
         return self.client._request(
             "POST",
             endpoint,
             json_data={
-                "relationTypeId": relation_type_id,
-                "sourceTopicId": topic_id,
-                "targetTopicIds": [target_topic_id]
+                "relationTypeId": relationTypeId,
+                "sourceTopicId": sourceTopicId,
+                "targetTopicIds": [targetTopicId]
             }
         )
 
