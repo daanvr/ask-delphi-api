@@ -186,6 +186,31 @@ class Import:
         topic_version_id_step = self.topic.get_topicVersionId(topic_id_step)
         return topic_id_step, topic_version_id_step
     
+    def keys_by_value(self, value):    
+        return [k for k, v in self.link_list.items() if v == value]
+
+    # Sources (linkjes) toevoegen aan pyramide
+    def add_sources(self, topic_id: str, topic_version_id: str, text: str, sources: list[dict]):
+
+        topic_id_links = []
+
+        # Externe linkjes waarvan de titel voorkomt in de text detecteren
+        for source in sources:
+            # print(f"{source["titel"]}, {source["type"]}, {source["link"]}")
+            if source["titel"].lower() in text.lower():
+                topic_id_link = self.link_list[source["titel"]]
+                topic_id_links.append(topic_id_link)
+
+        # RelationTypeId "Handleidingen en instructies" uitvragen
+        # Todo : In eerste instantie de links onder Handleidingen en instructies geplaatst, navraag hoe dit te verbeteren
+        relationTypeId = self.relation.get_relationTypeId_by_relationTypeName(topic_id, topic_version_id, "Handleidingen en instructies")
+
+        # Externe links als relatie in de pyramide toevoegen
+        for topic_id_link in topic_id_links:
+            self.relation.add_relation(topic_id, topic_version_id, relationTypeId, topic_id_link)
+            link_title = self.keys_by_value(topic_id_link)
+            print(f"Externe link : {link_title} toegevoegd onder Handleidingen en instructies")
+    
     # Create source topic
     def add_source(self, topic_id: str, topic_version_id: str, source: dict) -> str:
 
