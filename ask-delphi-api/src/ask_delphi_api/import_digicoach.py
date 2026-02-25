@@ -23,6 +23,16 @@ class Import:
         self.relation = Relation(self.client)
         self.link_list = {}
 
+    import re
+
+    def is_alleen_url(tekst):    
+        patroon = r"""^        
+            (https?:\/\/)?                 # optioneel http/https        
+            ([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,} # domeinnaam        
+            (\/\S*)?                       # optioneel pad    
+        $"""
+        return re.match(patroon, tekst.strip(), re.VERBOSE) is not None
+
     def create_source_topics(self, sources):
         topics = self.topic.fetch_topiclist()
         self.upload_source_topics(sources, topics)
@@ -176,47 +186,27 @@ class Import:
         topic_version_id_step = self.topic.get_topicVersionId(topic_id_step)
         return topic_id_step, topic_version_id_step
     
-    # Toevoegen sources aan pyramide
-    def add_sources(self, parentTopicId: str, parentTopicVersionId: str, text: str):
-        
+    # Create source topic
+    def add_source(self, topic_id: str, topic_version_id: str, source: dict) -> str:
 
-        print(f"source type : {source["type"]}")
+        # RelationTypeId uitvragen
+        parentTopicId = topic_id
+        parentTopicVersionId = topic_version_id
+        parentTopicRelationTypeId = self.relation.get_relationTypeId_by_relationTypeName(topic_id, topic_version_id, "Handleidingen en instructies")
 
-            # if source["type"] == "Handleidingen en instructies":
-                # if is_alleen_url(source["link"]):
-                #     # pprint.pp(source)
-                #     topic_id_source, topic_version_id_source = import_service.add_source_v2(topic_id_task, topic_version_id_task, source)
-                #     # import_service._get_topic().checkin(topic_id_source)
-                #     # topic_id_list.append(topic_id_source)
+        # Creatie source topic
+        topic_id_source = str(uuid.uuid4())
+        topic_title_source = source["titel"]   
+        topic_type_id_source = self.project.get_topic_type_id("External URL")
 
-            # parentTopicRelationTypeId "Handleidingen en instructies" uitvragen
-            # parentTopicRelationTypeId = self.relation.get_relationTypeId_by_relationTypeName(parentTopicId, parentTopicVersionId, "Handleidingen en instructies")
+        # Toevoegen source topic
+        self.relation.add_topic_with_relation(topic_id_source, topic_title_source, topic_type_id_source, parentTopicId, parentTopicRelationTypeId, parentTopicVersionId)
 
-            # Toevoegen source topic
-            # self.relation.add_relation(parentTopicId, parentTopicVersionId, parentTopicRelationTypeId, [topic_id])
+        # Update source topic
+        topic_version_id_source = self.topic.get_topicVersionId(topic_id_source)
+        self.add_link_to_topic(topic_id_source, topic_version_id_source, source["link"])
 
-    
-    # # Create source topic
-    # def add_source(self, topic_id: str, topic_version_id: str, source: dict) -> str:
-
-    #     # RelationTypeId uitvragen
-    #     parentTopicId = topic_id
-    #     parentTopicVersionId = topic_version_id
-    #     parentTopicRelationTypeId = self.relation.get_relationTypeId_by_relationTypeName(topic_id, topic_version_id, "Handleidingen en instructies")
-
-    #     # Creatie source topic
-    #     topic_id_source = str(uuid.uuid4())
-    #     topic_title_source = source["titel"]   
-    #     topic_type_id_source = self.project.get_topic_type_id("External URL")
-
-    #     # Toevoegen source topic
-    #     self.relation.add_topic_with_relation(topic_id_source, topic_title_source, topic_type_id_source, parentTopicId, parentTopicRelationTypeId, parentTopicVersionId)
-
-    #     # Update source topic
-    #     topic_version_id_source = self.topic.get_topicVersionId(topic_id_source)
-    #     self.add_link_to_topic(topic_id_source, topic_version_id_source, source["link"])
-
-    #     return topic_id_source, topic_version_id_source
+        return topic_id_source, topic_version_id_source
     
     def add_content_to_topic(self, topicId: str, topicVersionId: str, text: str):
         content = self.topic.get_topic_parts(topicId=topicId)

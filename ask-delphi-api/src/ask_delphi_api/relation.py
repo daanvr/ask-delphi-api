@@ -4,27 +4,21 @@ class Relation:
     def __init__(self, client: AskDelphiClient):
         self.client = client
 
-    def add_relation(self, topic_id: str, topic_version_id: str, relation_type_id: str, target_topic_ids: list):
+    def add_relation(self, topic_id: str, topic_version_id: str, relation_type_id: str, target_topic_id: str):
         """Voeg een relatie toe van dit topic naar andere topics."""
         endpoint = "v2/tenant/{tenantId}/project/{projectId}/acl/{aclEntryId}/topic/{topic_id}/topicVersion/{topic_version_id}/relation"
         return self.client._request(
+            "POST",
             endpoint,
-            json={
-                "relationTypeId": [3],
+            json_data={
+                "relationTypeId": relation_type_id,
                 "sourceTopicId": topic_id,
-                "targetTopicIds": target_topic_ids,
+                "targetTopicIds": [target_topic_id]
             }
         )
 
     def add_topic_with_relation(self, topicId: str, topicTitle: str, topicTypeId: str, parentTopicId: str, parentTopicRelationTypeId: str, parentTopicVersionId: str):
-        """Voeg een topic met een relatie naar andere topic toe.  
-        Args:        
-        - topicId (str): ID van het doel-topic.        
-        - topicTitle (str): Titel van het doel-topic.        
-        - topicTypeId (str): ID van het topictype.        
-        - parentTopicId (str): ID van het bron-topic.
-        - parentTopicRelationTypeId (str): ID van het relatietype.        
-        - parentTopicVersionId (str): Versie-ID van het bron-topic."""
+        """Voeg een topic met een relatie naar andere topic toe."""
         endpoint = "v4/tenant/{tenantId}/project/{projectId}/acl/{aclEntryId}/topic"
         return self.client._request(
             "POST",
