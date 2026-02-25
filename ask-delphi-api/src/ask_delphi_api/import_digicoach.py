@@ -1,4 +1,6 @@
 import uuid
+from typing import List, Dict
+import re
 from ask_delphi_api.authentication import AskDelphiClient
 from ask_delphi_api.project import Project
 from ask_delphi_api.topictools import TopicTools
@@ -19,16 +21,108 @@ class Import:
         self.project = Project(self.client)
         self.topic = TopicTools(self.client, self.project)
         self.relation = Relation(self.client)
+        self.link_list = {}
+
+    def create_source_topics(self, sources):
+        topics = self.topic.fetch_topiclist()
+        self.upload_source_topics(sources, topics)
+
+    def create_link_list(self, json_digicoach: list[dict], topics: list[dict]):
+
+        bronnen = {}
+
+        tasks = json_digicoach["tasks"]
+        for task in tasks:
+
+            topic = self.topic.get_topic_by_title(task["name"], topics)
+            bronnen[topic["title"]] = topic["topicGuid"]
+
+            steps = task["steps"]
+
+            for step in steps:
+                topic = self.topic.get_topic_by_title(step["name"], topics)
+                bronnen[topic["title"]] = topic["topicGuid"]
+
+        sources = json_digicoach["sources"]
+        for source in sources:
+            topic = self.topic.get_topic_by_title(source["titel"], topics)
+            bronnen[topic["title"]] = topic["topicGuid"]
+        
+        self.link_list = bronnen
+
+    def classify_url(self, url: str) -> str:
+        url = url.lower()
+
+        if "www.belastingdienst.nl" in url:             return "External URL"
+        elif "connectpeople.belastingdienst.nl" in url: return "ConnectPeople"
+        else:                                           return "External URL"
+
+    def upload_source_topics(self, sources: List[Dict], topics: List[Dict]):
+
+        # Opvragen aanwezige topics
+        # topics = self.topic.fetch_topiclist()
+
+        # Check source topic beschikbaar en zoniet aanmaken
+        for source in sources:
+            topic = self.topic.get_topic_by_title(source["titel"], topics)
+            if topic is not None:
+                print(f"Gevonden : {topic["topicGuid"]}, {topic["title"]}, {topic["topicTypeName"]}, {source["link"]}")
+            else:
+                topic_type_name = self.classify_url(source["link"])
+                topic_id = self.topic.topic_upload(source["titel"], topic_type_name)
+                topic_version_id = self.topic.get_topicVersionId(topic_id)
+                self.add_link_to_topic(topic_id, topic_version_id, source["link"])
+                self.topic.checkin(topic_id)
+                self.publiceer(topic_id)
+
+                print(f"Niet gevonden : {source["link"]} toegevoegd")
 
     def _get_topic(self):
         return self.topic
     
-    def create_link(self, description: str, topicId: str) -> str:
-        target = f"target=\"{topicId}\" use=\"default\" view=\"default\""
-        thumbnail= "" 
-        link = f"link=\"tenant/{self.client.tenant_id}/project/{self.client.project_id}/acl/{self.client.acl_entry_id}/topic/{topicId}/edit"
-        doppio_link = f"<doppio-link {target} title=\"{description}\" {thumbnail} {link}>{description}</doppio-link>"
-        return doppio_link
+    def create_link(self, description: str, target_topic_id: str) -> str:
+        link = f"\xa0<doppio-link " \
+            f"target=\"{target_topic_id}\" " \
+            f"use=\"default\" " \
+            f"view=\"default\" " \
+            f"title=\"{description}\" " \
+            f"thumbnail=\"\" " \
+            f"link=\"tenant/{self.client.tenant_id}/project/{self.client.project_id}/acl/{self.client.acl_entry_id}/topic/{target_topic_id}/edit\">" \
+            f"{description}</doppio-link><span>\xa0</span>"
+        return link
+    
+    # sources: Dict[str, str]
+    def hyperlink_html(self, description: str) -> str:
+
+        sources = self.link_list
+
+        if not sources:
+            return description
+
+        # titels sorteren lang -> kort
+        titles = sorted(sources.keys(), key=len, reverse=True)
+
+        # Bouw regex met named groups: (?P<titel>escaped_term)
+        parts = []
+        for idx, t in enumerate(titles):
+            group_name = f"G{idx}"
+            parts.append(f"(?P<{group_name}>{re.escape(t)})")
+
+        pattern = re.compile("|".join(parts), re.IGNORECASE)
+
+        def _repl(m: re.Match) -> str:
+            matched_text = m.group(0)
+            
+            # bepaal welke groep gematched is
+            for idx, t in enumerate(titles):
+                group_name = f"G{idx}"
+                if m.group(group_name):
+                    topicGuid = sources[t]
+                    return self.create_link(matched_text, topicGuid)
+
+            return matched_text  # zou nooit gebeuren
+
+        return pattern.sub(_repl, description)
         
     # Create Voorgedefinieerde zoekopdracht topic
     def create_voorgedefinieerde_zoekopdracht_topic(self, name: str) -> str:
@@ -82,27 +176,47 @@ class Import:
         topic_version_id_step = self.topic.get_topicVersionId(topic_id_step)
         return topic_id_step, topic_version_id_step
     
-    # Create source topic
-    def add_source(self, topic_id: str, topic_version_id: str, source: dict) -> str:
+    # Toevoegen sources aan pyramide
+    def add_sources(self, parentTopicId: str, parentTopicVersionId: str, text: str):
+        
 
-        # RelationTypeId uitvragen
-        parentTopicId = topic_id
-        parentTopicVersionId = topic_version_id
-        parentTopicRelationTypeId = self.relation.get_relationTypeId_by_relationTypeName(topic_id, topic_version_id, "Handleidingen en instructies")
+        print(f"source type : {source["type"]}")
 
-        # Creatie source topic
-        topic_id_source = str(uuid.uuid4())
-        topic_title_source = source["titel"]   
-        topic_type_id_source = self.project.get_topic_type_id("External URL")
+            # if source["type"] == "Handleidingen en instructies":
+                # if is_alleen_url(source["link"]):
+                #     # pprint.pp(source)
+                #     topic_id_source, topic_version_id_source = import_service.add_source_v2(topic_id_task, topic_version_id_task, source)
+                #     # import_service._get_topic().checkin(topic_id_source)
+                #     # topic_id_list.append(topic_id_source)
 
-        # Toevoegen source topic
-        self.relation.add_topic_with_relation(topic_id_source, topic_title_source, topic_type_id_source, parentTopicId, parentTopicRelationTypeId, parentTopicVersionId)
+            # parentTopicRelationTypeId "Handleidingen en instructies" uitvragen
+            # parentTopicRelationTypeId = self.relation.get_relationTypeId_by_relationTypeName(parentTopicId, parentTopicVersionId, "Handleidingen en instructies")
 
-        # Update source topic
-        topic_version_id_source = self.topic.get_topicVersionId(topic_id_source)
-        self.add_link_to_topic(topic_id_source, topic_version_id_source, source["link"])
+            # Toevoegen source topic
+            # self.relation.add_relation(parentTopicId, parentTopicVersionId, parentTopicRelationTypeId, [topic_id])
 
-        return topic_id_source, topic_version_id_source
+    
+    # # Create source topic
+    # def add_source(self, topic_id: str, topic_version_id: str, source: dict) -> str:
+
+    #     # RelationTypeId uitvragen
+    #     parentTopicId = topic_id
+    #     parentTopicVersionId = topic_version_id
+    #     parentTopicRelationTypeId = self.relation.get_relationTypeId_by_relationTypeName(topic_id, topic_version_id, "Handleidingen en instructies")
+
+    #     # Creatie source topic
+    #     topic_id_source = str(uuid.uuid4())
+    #     topic_title_source = source["titel"]   
+    #     topic_type_id_source = self.project.get_topic_type_id("External URL")
+
+    #     # Toevoegen source topic
+    #     self.relation.add_topic_with_relation(topic_id_source, topic_title_source, topic_type_id_source, parentTopicId, parentTopicRelationTypeId, parentTopicVersionId)
+
+    #     # Update source topic
+    #     topic_version_id_source = self.topic.get_topicVersionId(topic_id_source)
+    #     self.add_link_to_topic(topic_id_source, topic_version_id_source, source["link"])
+
+    #     return topic_id_source, topic_version_id_source
     
     def add_content_to_topic(self, topicId: str, topicVersionId: str, text: str):
         content = self.topic.get_topic_parts(topicId=topicId)
@@ -114,6 +228,9 @@ class Import:
             for part in group['parts']:
                 if part["partId"] == "body":
                     body_part = part
+
+        # Interne en externe links
+        text = self.hyperlink_html(text) 
 
         # Pas content topic aan.
         self.topic.topic_add_content(topicVersionId=topicVersionId, topicId=topicId, partId="body", part=body_part, new_text=text)
