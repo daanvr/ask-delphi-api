@@ -1,14 +1,25 @@
+import re
+from typing import List, Dict
+import pprint
 from typing import Optional, Dict
 from datetime import datetime
 from ask_delphi_api.authentication import AskDelphiClient
 from ask_delphi_api.project import Project
-import pprint
 
 class TopicTools:
     
     def __init__(self, client: AskDelphiClient, project: Project):
         self.client = client
         self.project = project
+
+    def get_topic_by_title(self, title: str, topics: List[Dict]):
+        # Alle topics met dezelfde title filteren
+        matching = [t for t in topics if t.get("title") == title]
+        if not matching:
+            return None
+        # Nieuwste bepalen op basis van lastModificationDate
+        topic = max(matching, key=lambda t: t.get("lastModificationDate"))
+        return topic
 
     def get_topic_parts(self, topicId: str):
         """Haal alle parts op van topic met topicId."""

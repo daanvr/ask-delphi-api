@@ -52,6 +52,7 @@ def convert_doc_to_tables(path):
             tables.append(df)
 
     print(f"retrieved {len(tables)} tables from doc {path}")
+    
     return tables
 
 def filter_tables_by_title(table_list, keyword):
@@ -143,11 +144,44 @@ def extract_digicoach_tasks(tables):
         print(f"Found task: {task_name}")
     return tasks
 
+def extract_digicoach_sources(tables):
+    sources = []
+
+    source_tables = filter_tables_by_title(tables, "nr")
+    
+    if len(source_tables) == 0:
+        raise ValueError("No source tables found")
+    
+    for table in source_tables:
+        new_source = {}
+       
+        data = table.iloc[:,[1,2,3]]
+        data = data.replace("", np.nan).dropna()
+        
+        instruction_df = pd.DataFrame(
+            data.values.reshape(-1,3),
+            columns = ["Titel", "Type", "Link"]
+        )
+
+        for _, row in instruction_df.iterrows():
+            new_source = {}
+            source_titel = row["Titel"]
+            source_titel = clean_strip(source_titel)
+            new_source["titel"] = source_titel
+            new_source["type"] = row["Type"]
+            new_source["link"] = row["Link"]
+            sources.append(new_source)
+        
+        print(f"Found sources: {sources}")
+
+    return sources
+
 def convert_doc_to_json(path):
     tables = convert_doc_to_tables(path)
     title = extract_digicoach_title(tables)
     tags = extract_digicoach_tags(tables)
     tasks = extract_digicoach_tasks(tables)
-    digicoach = {"name": title,  "tags": tags, "tasks": tasks}
+    sources = extract_digicoach_sources(tables)
+    digicoach = {"name": title,  "tags": tags, "tasks": tasks, "sources": sources}
     digicoach_json = json.dumps(digicoach, indent=2)
     return digicoach_json
