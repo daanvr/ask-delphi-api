@@ -1,5 +1,5 @@
 from ask_delphi_api.authentication import AskDelphiClient
-from ask_delphi_api.constant import CONSTANTS_DIRECTIE, CONSTANTS_KETEN, CONSTANTS_MIDDEL
+from ask_delphi_api.constant import CONSTANTS_DIRECTIE, CONSTANTS_KETEN, CONSTANTS_MIDDEL, CONSTANTS_DOCUMENT_TYPE
 
 class Relation:
     def __init__(self, client: AskDelphiClient):
@@ -63,7 +63,7 @@ class Relation:
         for item in result["topicAllowedRelations"]:
             # print(item)
             if item['relationTypeName'] == relationTypeName:
-                print(f"{item['relationTypeName']} => relationTypeId {item["relationTypeId"]}")
+                # print(f"{item['relationTypeName']} => relationTypeId {item["relationTypeId"]}")
                 relationTypeId = item["relationTypeId"]
                 break
         
@@ -80,12 +80,13 @@ class Relation:
     
     def add_tags_to_topic(self, topic_id : str, topic_version_id : str, tags : dict, project_tags : dict):
         for tag in tags:
-            print(tag["type"])
+            # print(tag["type"])
             for value in tag["values"]:
                 if tag["type"] == "Directie" : value = CONSTANTS_DIRECTIE[value]
                 elif tag["type"] == "Keten"  : value = CONSTANTS_KETEN[value]
                 elif tag["type"] == "Middel" : value = CONSTANTS_MIDDEL[value]
+                elif tag["type"] == "Document_type" : value = CONSTANTS_DOCUMENT_TYPE[value]
                 tag_data = project_tags[value]
-                print(f"{tag_data["hierarchyNodeTitle"]}, {tag_data["hierarchyTopicId"]}")
+                # print(f"{tag_data["hierarchyNodeTitle"]}, {tag_data["hierarchyTopicId"]}")
                 self.add_tag(topic_id, topic_version_id, tag_data)
 
