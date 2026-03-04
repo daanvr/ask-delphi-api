@@ -1,4 +1,5 @@
 from ask_delphi_api.authentication import AskDelphiClient
+from ask_delphi_api.constant import CONSTANTS_DIRECTIE, CONSTANTS_KETEN, CONSTANTS_MIDDEL
 
 class Relation:
     def __init__(self, client: AskDelphiClient):
@@ -32,12 +33,6 @@ class Relation:
                 "parentTopicVersionId": parentTopicVersionId
             }
         )
-
-    def add_tag(self, topic_id: str, topic_version_id: str, hierarchyNodeTitle: str):
-        """Voeg een tag toe aan een topic."""
-        tag_data = self.get_tag_data(topic_id, topic_version_id, hierarchyNodeTitle)
-        endpoint = f"/v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topic_id}/topicVersion/{topic_version_id}/tag"
-        return self.client._request("POST", endpoint, json_data={"tags": [tag_data]})
 
     def get_relation_type_id(self, topic_id: str, topicVersionId: str, topicTypeName: str) -> str:
         """Get relation type ID for topicTypeName"""
@@ -74,14 +69,23 @@ class Relation:
         
         return relationTypeId
     
-    def get_tag_data(self, topicId: str, topicVersionId: str, hierarchyNodeTitle: str):
+    def get_project_tags(self, topicId: str, topicVersionId: str):
         endpoint = f"/v1/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topicId}/topicVersion/{topicVersionId}/editortagmodel"
         response = self.client._request("GET", endpoint)
-        # response = response.get("response", response)
+        return {item["hierarchyNodeTitle"]: item for item in response['data']['projectTags']}
 
-        tag_data = {}
-        for tag in response['data']['projectTags']:
-            if tag["hierarchyNodeTitle"].lower() == hierarchyNodeTitle:
-                tag_data = tag
-                break
-        return tag_data
+    def add_tag(self, topic_id : str, topic_version_id : str, tag_data: dict):
+        endpoint = f"/v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topic_id}/topicVersion/{topic_version_id}/tag"
+        return self.client._request("POST", endpoint, json_data={"tags": [tag_data]})
+    
+    def add_tags_to_topic(self, topic_id : str, topic_version_id : str, tags : dict, project_tags : dict):
+        for tag in tags:
+            print(tag["type"])
+            for value in tag["values"]:
+                if tag["type"] == "Directie" : value = CONSTANTS_DIRECTIE[value]
+                elif tag["type"] == "Keten"  : value = CONSTANTS_KETEN[value]
+                elif tag["type"] == "Middel" : value = CONSTANTS_MIDDEL[value]
+                tag_data = project_tags[value]
+                print(f"{tag_data["hierarchyNodeTitle"]}, {tag_data["hierarchyTopicId"]}")
+                self.add_tag(topic_id, topic_version_id, tag_data)
+
