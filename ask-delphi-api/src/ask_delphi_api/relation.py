@@ -66,7 +66,7 @@ class Relation:
 
         relationTypeId = ""
         for item in result["topicAllowedRelations"]:
-            # print(item)
+            print(item)
             if item['relationTypeName'] == relationTypeName:
                 print(f"{item['relationTypeName']} => relationTypeId {item["relationTypeId"]}")
                 relationTypeId = item["relationTypeId"]
