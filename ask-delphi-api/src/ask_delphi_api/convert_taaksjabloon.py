@@ -84,60 +84,6 @@ def cell_to_html(cell):
         current_level -= 1
 
     return "\n".join(output)
-# def cell_to_html(cell):
-#     """Convert a docx table cell to an HTML string, preserving
-#     bold, italic, underline, and list formatting."""
-#     from docx.oxml.ns import qn
-
-#     html_parts = []
-
-#     for paragraph in cell.paragraphs:
-#         # Detect list items via numbering properties
-#         pPr = paragraph._p.find(qn("w:pPr"))
-#         numPr = pPr.find(qn("w:numPr")) if pPr is not None else None
-
-#         runs_html = []
-#         for run in paragraph.runs:
-#             text = run.text
-#             if not text:
-#                 continue
-#             text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-#             if run.bold:
-#                 text = f"<strong>{text}</strong>"
-#             if run.italic:
-#                 text = f"<em>{text}</em>"
-#             if run.underline:
-#                 text = f"<u>{text}</u>"
-#             runs_html.append(text)
-
-#         line = "".join(runs_html)
-#         if not line:
-#             continue
-
-#         if numPr is not None:
-#             html_parts.append(("li", line))
-#         else:
-#             html_parts.append(("p", line))
-
-#     # Group consecutive <li> items into <ul> blocks
-#     output = []
-#     in_list = False
-#     for tag, content in html_parts:
-#         if tag == "li":
-#             if not in_list:
-#                 output.append("<ul>")
-#                 in_list = True
-#             output.append(f"  <li>{content}</li>")
-#         else:
-#             if in_list:
-#                 output.append("</ul>")
-#                 in_list = False
-#             output.append(f"<p>{content}</p>")
-#     if in_list:
-#         output.append("</ul>")
-
-#     return "\n".join(output)
-
 
 def convert_doc_to_tables(path):
     """Return (text_tables, html_tables): two parallel lists of DataFrames.
