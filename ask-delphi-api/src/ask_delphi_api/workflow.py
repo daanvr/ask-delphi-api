@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Optional, Dict, Any
 from ask_delphi_api.authentication import AskDelphiClient
 from datetime import datetime, timezone
 

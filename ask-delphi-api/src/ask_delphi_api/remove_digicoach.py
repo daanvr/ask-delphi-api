@@ -139,11 +139,14 @@ class RemoveDigicoach:
 
             # Verwijder stap topics en relations met de taken
             for action_topic_id in action_topic_ids:
+                print("Opruimen Digicoach stap plus relatie taak")
                 self.delete_relation(task_topic_id, action_topic_id, "Stap")
                 self.soft_delete_topic(action_topic_id, workflowstage_ids_list)
 
             # Verwijder taak topic en relation met de digicoach
+            print("Opruimen Digicoach taak plus relatie proces")
             self.delete_relation(topic_id_digicoach, task_topic_id, "Taak")
             self.soft_delete_topic(task_topic_id, workflowstage_ids_list)
 
+        print("Opruimen Digicoach proces")
         response = self.soft_delete_topic(topic_id_digicoach, workflowstage_ids_list)
