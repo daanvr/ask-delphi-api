@@ -4,6 +4,20 @@ class Relation:
     def __init__(self, client: AskDelphiClient):
         self.client = client
 
+    def _delete_topic_relation(self, source_id: str, source_version_id: str, target_id: str, relation_type_id: str):
+        """POST-call om een topic-relatie te verwijderen."""
+        endpoint = (
+            f"v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}"
+            f"/topic/{source_id}/topicVersion/{source_version_id}/relation/delete"
+        )
+        data = {
+            "relationTypeId": relation_type_id,
+            "sourceTopicId": source_id,
+            "targetTopicId": target_id,
+        }
+        return self.client._request("POST", endpoint, json_data=data)
+    
+
     def add_relation(self, sourceTopicId: str, sourceTopicVersionId: str, relationTypeId: str, targetTopicId: str):
         """Voeg een relatie toe van dit topic naar andere topics."""
         endpoint = f"v2/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{sourceTopicId}/topicVersion/{sourceTopicVersionId}/relation"
