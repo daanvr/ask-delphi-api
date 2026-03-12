@@ -4,6 +4,9 @@ import pandas as pd
 import warnings
 import re
 import json
+import tempfile
+import mimetypes
+from docx.oxml.ns import qn
 
 
 def read_dir(dir_path):
@@ -19,11 +22,92 @@ def read_dir(dir_path):
 
     return paths
 
-def cell_to_html(cell):
+def extract_image_from_run(run, document):
+    """Haal image bytes en extensie op uit een run met een inline image.
+    
+    Returns (image_bytes, file_extension) of None als er geen image is.
+    """
+    drawing_els = run._r.findall(qn("w:drawing"))
+    if not drawing_els:
+        return None
+
+    for drawing in drawing_els:
+        # Zoek de blip (bevat de relatie-ID naar de image)
+        blips = drawing.findall(f".//{qn('a:blip')}")
+        for blip in blips:
+            rId = blip.get(qn("r:embed"))
+            if rId is None:
+                continue
+            # Haal de image part op via de relatie
+            rel = run.part.rels.get(rId)
+            if rel is None:
+                continue
+            image_part = rel.target_part
+            content_type = image_part.content_type  # bijv. "image/png"
+            image_bytes = image_part.blob
+
+            # Bepaal extensie op basis van content type
+            ext_map = {
+                "image/png": ".png",
+                "image/jpeg": ".jpg",
+                "image/gif": ".gif",
+                "image/bmp": ".bmp",
+                "image/tiff": ".tiff",
+                "image/svg+xml": ".svg",
+            }
+            ext = ext_map.get(content_type, ".png")
+            return image_bytes, ext, content_type
+    return None
+
+
+def upload_image_bytes(client, image_bytes, filename, mime_type):
+    """Upload image bytes naar AskDelphi /resource endpoint.
+    
+    Returns de response dict met resource info.
+    """
+    endpoint = "/v2/tenant/{tenantId}/project/{projectId}/acl/{aclEntryId}/resource"
+
+    # Schrijf bytes naar een tijdelijk bestand
+    with tempfile.NamedTemporaryFile(suffix=Path(filename).suffix, delete=False) as tmp:
+        tmp.write(image_bytes)
+        tmp_path = tmp.name
+
+    try:
+        with open(tmp_path, "rb") as f:
+            files = {"File": (filename, f, mime_type)}
+            response = client._request("POST", endpoint, files=files)
+        return response
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
+
+
+def build_image_embed_html(client, resource_response):
+    """Bouw een <doppio-embedded> tag van een upload_image response."""
+    res = resource_response["resource"]
+    topic_guid = res["topicGuid"]
+    title = res["title"]
+    thumbnail = res["thumbnailImageBase64"]
+
+    link = (
+        f"tenant/{client.tenant_id}"
+        f"/project/{client.project_id}"
+        f"/acl/{client.acl_entry_id}"
+        f"/topic/{topic_guid}/edit"
+    )
+
+    return (
+        f'<p><doppio-embedded '
+        f'target="{topic_guid}" '
+        f'use="default" view="default" '
+        f'title="{title}" '
+        f'thumbnail="data:image/png;base64,{thumbnail}" '
+        f'link="{link}">'
+        f'\xa0</doppio-embedded></p>'
+    )
+
+def cell_to_html(cell, client=None, document=None):
     """Convert a docx table cell to an HTML string, preserving
     bold, italic, underline, and list formatting."""
-    from docx.oxml.ns import qn
-
     html_parts = []  # list of ("p", text) or ("li", level, text)
 
     for paragraph in cell.paragraphs:
@@ -33,6 +117,16 @@ def cell_to_html(cell):
 
         runs_html = []
         for run in paragraph.runs:
+            if client is not None:
+                image_data = extract_image_from_run(run, document)
+                if image_data is not None:
+                    image_bytes, ext, content_type = image_data
+                    filename = f"image{ext}"
+                    resource = upload_image_bytes(client, image_bytes, filename, content_type)
+                    embed_html = build_image_embed_html(client, resource)
+                    runs_html.append(embed_html)
+                    continue
+
             text = run.text
             if not text:
                 continue
@@ -85,7 +179,7 @@ def cell_to_html(cell):
 
     return "\n".join(output)
 
-def convert_doc_to_tables(path):
+def convert_doc_to_tables(path, client=None):
     """Return (text_tables, html_tables): two parallel lists of DataFrames.
     text_tables contain plain text (used for filtering and logic),
     html_tables contain HTML strings (used for rich descriptions)."""
@@ -105,7 +199,7 @@ def convert_doc_to_tables(path):
             html_row = []
             for cell in row.cells:
                 text_row.append(cell.text.strip())
-                html_row.append(cell_to_html(cell))
+                html_row.append(cell_to_html(cell, client=client, document=document))
             text_data.append(text_row)
             html_data.append(html_row)
 
@@ -267,8 +361,8 @@ def extract_digicoach_sources(text_tables):
     return sources
 
 
-def convert_doc_to_json(path):
-    text_tables, html_tables = convert_doc_to_tables(path)
+def convert_doc_to_json(path, client=None):
+    text_tables, html_tables = convert_doc_to_tables(path, client=client)
     title = extract_digicoach_title(text_tables)
     tags = extract_digicoach_tags(text_tables)
     tasks = extract_digicoach_tasks(text_tables, html_tables)
