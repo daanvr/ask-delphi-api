@@ -154,7 +154,9 @@ class AskDelphiClient:
         method: str,
         endpoint: str,
         json_data: Optional[Dict] = None,
-        params: Optional[Dict] = None
+        params: Optional[Dict] = None,
+        files: Optional[Dict[str, tuple]] = None,
+        data: Optional[Dict] = None
     ):
         """Perform an authenticated request to the AskDelphi Editing API."""
 
@@ -182,10 +184,15 @@ class AskDelphiClient:
 
         headers = {
             "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
+            # "Content-Type": "application/json",
             "Accept": "application/json",
             "User-Agent": "AskDelphi-Python-Client/1.0"
         }
+
+        # Alleen Content-Type zetten als we GEEN files uploaden
+        # Bij files laat requests automatisch multipart/form-data zetten
+        if not files:
+            headers["Content-Type"] = "application/json"
 
         # Execute HTTP request
         try:
@@ -193,8 +200,10 @@ class AskDelphiClient:
                 method=method,
                 url=url,
                 headers=headers,
-                json=json_data,
+                json=json_data if not files else None,
                 params=params,
+                files=files,
+                data=data,
                 timeout=60
             )
         except Exception as e:
