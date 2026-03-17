@@ -83,7 +83,7 @@ class Import:
                 topic_version_id = self.topic.get_topicVersionId(topic_id)
                 self.add_link_to_topic(topic_id, topic_version_id, source["link"])
                 self.topic.checkin(topic_id)
-                self.publiceer(topic_id)
+                self.workflow.publiceer(topic_id)
 
                 print(f"Niet gevonden : {source["link"]} toegevoegd")
 
@@ -264,11 +264,3 @@ class Import:
 
         # Pas content topic aan.
         self.topic.topic_add_link(topicVersionId=topicVersionId, topicId=topicId, partId="link-meta-data", part=body_part, new_text=url)
-
-
-    #  Creates a workflow transition request for predefined_search topic.
-    def publiceer(self, topic_id: str):
-        request_id = self.workflow.create_workflow_transition_request(topic_id)
-        transitions_model = self.workflow.get_workflow_transition_request_transitions_model(request_id)
-        self.workflow.update_workflow_transition_request(request_id, transitions_model)
-        self.workflow.approve_workflow_transition_request(request_id)

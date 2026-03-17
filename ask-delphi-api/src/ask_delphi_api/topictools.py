@@ -12,6 +12,12 @@ class TopicTools:
         self.client = client
         self.project = project
 
+    def get_topic_relation(self, topicId: str):
+        """Opvragen topic relations."""
+        endpoint = f"v1/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topicId}/relation"
+        data = {}
+        return self.client._request("GET", endpoint, json_data=data)
+
     def get_topic_by_title(self, title: str, topics: List[Dict]):
         # Alle topics met dezelfde title filteren
         matching = [t for t in topics if t.get("title") == title]
@@ -55,11 +61,15 @@ class TopicTools:
         topic = self.client._request("POST", endpoint, json_data=data)
         return topic["topicId"]
     
-    def delete_topic(self, topicId: str, topicVersionId: str):
-        """Verwijder een topic."""
-        endpoint = f"v3/tenant/{{tenantId}}/project/{{projectId}}/acl/{{aclEntryId}}/topic/{topicId}/topicVersion/{topicVersionId}"
-        data = {
-            "workflowActions": {}
+    def delete_topic(self, topic_id: str, version_id: str, workflowstage_ids: list):
+        """Voert de DELETE-call uit voor een topic."""
+        endpoint = (
+            f"v3/tenant/{{tenantId}}/project/{{projectId}}/"
+            f"acl/{{aclEntryId}}/topic/{topic_id}/topicVersion/{version_id}"
+        )
+        data = {"workflowActions": {
+            "applyWorkflowStageIds": workflowstage_ids,
+            "increaseMajorVersionNo": True}
         }
         return self.client._request("DELETE", endpoint, json_data=data)
     
