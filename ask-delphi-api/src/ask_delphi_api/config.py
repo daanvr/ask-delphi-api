@@ -1,3 +1,12 @@
+"""
+IDs, constanten en project-configuratie.
+"""
+from ask_delphi_api import api
+
+# ---------------------------------------------------------------------------
+# Tag-waarde mappings
+# ---------------------------------------------------------------------------
+
 CONSTANTS_AFKORTING = {
     "IH, IB"                : "IH, IB",
     "INV"                   : "INV",
@@ -24,7 +33,7 @@ CONSTANTS_DIRECTIE = {
     "O&P"                   : "Directie O en P",
     "FIOD"                  : "FIOD (Fiscale Inlichtingen en Opsporingsdienst)",
     "GO"                    : "GO (Grote Ondernemingen)",
-    "IV"                    : "IV (Informatievoorziening)", 
+    "IV"                    : "IV (Informatievoorziening)",
     "KI&S"                  : "KIenS (Klantinteractie en Services)",
     "MKB"                   : "MKB (Midden- en Kleinbedrijf)",
     "Medezeggenschap"       : "Medezeggenschap",
@@ -33,7 +42,7 @@ CONSTANTS_DIRECTIE = {
     "CFD"                   : "SSO CFD (Centrum voor Facilitaire Dienstverlening)",
     "F&MI"                  : "SSO F en MI (Financieel en Managementinformatie)"
 }
- 
+
 CONSTANTS_DOCUMENT_TYPE = {
     "Digitale coach"        : "Digitale coach",
     "Proces"                : "Proces",
@@ -46,7 +55,7 @@ CONSTANTS_DOCUMENT_TYPE = {
     "Vakliteratuur"         : "Vakliteratuur",
     "Voorbeelden"           : "Voorbeelden",
     "Video"                 : "Video"
- }
+}
 
 CONSTANTS_KENNIS_DOMEIN = {
     "Burgerlijk recht"      : "Burgerlijk recht",
@@ -57,7 +66,7 @@ CONSTANTS_KENNIS_DOMEIN = {
 
 CONSTANTS_MIDDEL = {
     "Accijns"                   : "Accijns",
-    "Belastingen op personenauto’s motorrijwielers" : "Belastingen op personenauto's motorrijwielen",
+    "Belastingen op personenauto's motorrijwielers" : "Belastingen op personenauto's motorrijwielen",
     "Dividendbelasting"         : "Dividendbelasting",
     "Erfbelasting"              : "Erfbelasting",
     "Huurtoeslag"               : "Huurtoeslag",
@@ -75,7 +84,7 @@ CONSTANTS_MIDDEL = {
     "Vennootschapsbelasting"    : "Vennootschapsbelasting",
     "Zorgtoeslag"               : "Zorgtoeslag"
 }
- 
+
 CONSTANTS_KETEN = {
     "Aangifte"                      : "Aangifte",
     "Aanslag"                       : "Aanslag",
@@ -86,3 +95,33 @@ CONSTANTS_KETEN = {
     "Inning en betalingsverkeer"    : "Inning en betalingsverkeer",
     "Interactie"                    : "Interactie"
 }
+
+
+# ---------------------------------------------------------------------------
+# Project configuratie functies
+# ---------------------------------------------------------------------------
+
+def get_topic_types(client):
+    """Haalt de beschikbare topictype mapping op (title → key)."""
+    response = api.get_content_design(client)
+    contentdesign = response.get("response", response)
+    topic_types = contentdesign.get("topicTypes", [])
+
+    topic_type_map = {}
+    for tt in topic_types:
+        topic_type_map[tt.get("title")] = tt.get("key")
+
+    return topic_type_map
+
+
+def get_topic_type_id(client, topic_type_name):
+    """Haalt de topictype ID op voor een gegeven naam."""
+    topic_type_map = get_topic_types(client)
+    topic_type_id = topic_type_map.get(topic_type_name)
+
+    if topic_type_id is None:
+        raise ValueError(
+            f"Unknown topic type: {topic_type_name}",
+            f"Available types: {list(topic_type_map.keys())}")
+
+    return topic_type_id
